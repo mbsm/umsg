@@ -105,6 +105,24 @@ namespace umsg
             return transport_.write(packet.data, packet.length);
         }
 
+        /**
+         * @brief Publish a typed message with an explicit msgId.
+         *
+         * Requirements on Msg:
+         * - static const uint32_t kMsgHash
+         * - bool encode(umsg::bufferSpan& payload) const
+         */
+        template <class Msg>
+        bool publish(uint8_t msgId, const Msg &msg)
+        {
+            bufferSpan payload{txPacket_, MaxPayloadSize};
+            if (!msg.encode(payload))
+            {
+                return false;
+            }
+            return publish(msgId, Msg::kMsgHash, payload);
+        }
+
     private:
         Transport &transport_;
         FramerType framer_;

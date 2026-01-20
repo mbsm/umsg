@@ -40,6 +40,6 @@ The generated struct includes:
 - `static const uint32_t kMsgHash` (FNV-1a 32-bit of canonicalized schema text)
 - `static const size_t kPayloadSize`
 - `bool encode(umsg::bufferSpan& payload) const` (capacity-in / length-out)
-- `bool decode(umsg::bufferSpan payload)` (strict: fails on trailing bytes)
+- `bool decode(umsg::bufferSpan payload)` (permissive: requires at least `kPayloadSize`, ignores trailing bytes)
 
 The generated encode/decode uses `umsg::Writer` and `umsg::Reader` from `marshalling.hpp`.

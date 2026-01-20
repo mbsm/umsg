@@ -252,6 +252,7 @@ def emit_header(msg: Message, source_path: Optional[str] = None, header_guard: O
 
     struct_lines.append("    bool decode(umsg::bufferSpan payload)")
     struct_lines.append("    {")
+    struct_lines.append("        if (payload.length < kPayloadSize) return false;")
     struct_lines.append("        umsg::Reader r(payload);")
 
     for f in msg.fields:
@@ -260,7 +261,7 @@ def emit_header(msg: Message, source_path: Optional[str] = None, header_guard: O
         else:
             struct_lines.append(f"        if (!r.readArray({f.name}, {f.array_len}u)) return false;")
 
-    struct_lines.append("        return r.fullyConsumed();")
+    struct_lines.append("        return true;")
     struct_lines.append("    }")
 
     struct_lines.append("};")

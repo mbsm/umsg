@@ -38,11 +38,12 @@ struct state_t
 
     bool decode(umsg::bufferSpan payload)
     {
+        if (payload.length < kPayloadSize) return false;
         umsg::Reader r(payload);
         if (!r.read(timestamp)) return false;
         if (!r.readArray(p, 3u)) return false;
         if (!r.readArray(q, 4u)) return false;
         if (!r.read(ok)) return false;
-        return r.fullyConsumed();
+        return true;
     }
 };
