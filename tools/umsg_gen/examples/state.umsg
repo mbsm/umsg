@@ -1,0 +1,7 @@
+// Example message schema
+struct state_t {
+    uint64_t timestamp;
+    double p[3];  // position
+    double q[4];  // quaternion
+    bool ok;
+};

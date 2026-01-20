@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "umsg_common.hpp"
+#include "common.hpp"
 #include "framer.hpp"
 
 namespace

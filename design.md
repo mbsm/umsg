@@ -58,6 +58,10 @@ Marshaling:
 
 Goal: deterministic, cross-platform serialization for simple message structs, with no dynamic allocation.
 
+Implementation note (library support):
+- `common.hpp` provides `umsg::bufferSpan` and sizing helpers.
+- `marshalling.hpp` provides big-endian helpers and the canonical `umsg::Writer` / `umsg::Reader` primitives described below.
+
 ### Supported fields
 
 Messages are C++11 structs containing only:

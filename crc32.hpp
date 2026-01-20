@@ -2,8 +2,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "umsg_common.hpp"
-
 /**
  * @file crc32.hpp
  * @brief CRC-32/ISO-HDLC implementation used by the wire protocol.

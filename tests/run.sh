@@ -14,6 +14,7 @@ c++ -std=c++11 -Wall -Wextra -Werror -pedantic \
   "$ROOT_DIR/tests/test_framer.cpp" \
   "$ROOT_DIR/tests/test_router.cpp" \
   "$ROOT_DIR/tests/test_node.cpp" \
+  "$ROOT_DIR/tests/test_marshal.cpp" \
   -o "$OUT_DIR/umsg_tests"
 
 "$OUT_DIR/umsg_tests"

@@ -1,0 +1,40 @@
+#pragma once
+#include <stddef.h>
+#include <stdint.h>
+
+#include "marshalling.hpp"
+
+struct state_t
+{
+    uint64_t timestamp;
+    double p[3];
+    double q[4];
+    bool ok;
+
+    static const uint32_t kMsgHash = 0x4521EF3Eu;
+    static const size_t kPayloadSize = sizeof(uint64_t) + (sizeof(double) * 3u) + (sizeof(double) * 4u) + sizeof(bool);
+
+    bool encode(umsg::bufferSpan& payload) const
+    {
+        if (!payload.data) return false;
+        const size_t cap = payload.length;
+        umsg::Writer w(payload);
+        if (!w.write(timestamp)) return false;
+        if (!w.writeArray(p, 3u)) return false;
+        if (!w.writeArray(q, 4u)) return false;
+        if (!w.write(ok)) return false;
+        if (w.bytesWritten() > cap) return false;
+        payload.length = w.bytesWritten();
+        return true;
+    }
+
+    bool decode(umsg::bufferSpan payload)
+    {
+        umsg::Reader r(payload);
+        if (!r.read(timestamp)) return false;
+        if (!r.readArray(p, 3u)) return false;
+        if (!r.readArray(q, 4u)) return false;
+        if (!r.read(ok)) return false;
+        return r.fullyConsumed();
+    }
+};

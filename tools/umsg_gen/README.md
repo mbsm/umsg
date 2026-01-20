@@ -1,0 +1,38 @@
+# umsg_gen
+
+Small stdlib-only generator that turns `.umsg` message definitions into C++11 headers.
+
+## Usage
+
+```sh
+python3 tools/umsg_gen/umsg_gen.py path/to/message.umsg -o generated/
+```
+
+This writes `generated/<struct_name>.hpp`.
+
+## Input format (restricted)
+
+A `.umsg` file contains exactly one struct:
+
+```cpp
+struct state_t {
+    uint64_t timestamp;
+    double p[3];
+    bool ok;
+};
+```
+
+Supported field types:
+- `uint8_t/int8_t`, `uint16_t/int16_t`, `uint32_t/int32_t`, `uint64_t/int64_t`
+- `bool`, `float`, `double`
+- fixed-size arrays like `double q[4];`
+
+## Output
+
+The generated struct includes:
+- `static const uint32_t kMsgHash` (FNV-1a 32-bit of canonicalized schema text)
+- `static const size_t kPayloadSize`
+- `bool encode(umsg::bufferSpan& payload) const` (capacity-in / length-out)
+- `bool decode(umsg::bufferSpan payload)` (strict: fails on trailing bytes)
+
+The generated encode/decode uses `umsg::Writer` and `umsg::Reader` from `marshalling.hpp`.

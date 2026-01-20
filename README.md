@@ -93,3 +93,9 @@ A small dependency-free test suite is included:
 - `./tests/run.sh`
 
 See `tests/README.md` for what each test covers.
+
+## Generator (umsg_gen)
+
+A small stdlib-only Python generator is included to turn `.umsg` schemas into C++11 headers:
+
+- See [tools/umsg_gen/README.md](tools/umsg_gen/README.md)

@@ -21,8 +21,8 @@ Update: `Router` is now implemented in `router.hpp`.
 - `umsg.h` is the primary public include; it pulls in `Framer`, `Router`, `Node`, and helpers.
 - Prefer explicit sizes (`uint8_t`, `size_t`) and fixed-size buffers templated by max size.
 - Use spans instead of owning containers: `umsg::bufferSpan { uint8_t* data; size_t length; }`.
-- Common utilities live in `umsg_common.hpp` (e.g., `bufferSpan`, big-endian helpers).
-- Size helpers live in `umsg_common.hpp` (`maxFrameSize(maxPayload)`, `maxPacketSize(maxPayload)`).
+- Common utilities live in `common.hpp` (e.g., `bufferSpan`, size helpers).
+- Endian helpers and marshaling primitives live in `marshalling.hpp`.
 
 ## `Framer` API + callback pattern
 - `template <size_t MaxPacketSize> class Framer` owns `rxBuffer_[MaxPacketSize]` and `rxIndex_`.

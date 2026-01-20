@@ -7,6 +7,7 @@ void test_cobs(umsg_test::TestContext &ctx);
 void test_framer(umsg_test::TestContext &ctx);
 void test_router(umsg_test::TestContext &ctx);
 void test_node(umsg_test::TestContext &ctx);
+void test_marshal(umsg_test::TestContext &ctx);
 
 int main()
 {
@@ -25,6 +26,7 @@ int main()
         {"framer", "COBS+CRC framing/deframing", &test_framer},
         {"router", "Frame parsing + handler dispatch", &test_router},
         {"node", "Transport integration end-to-end", &test_node},
+        {"marshal", "Canonical payload Writer/Reader", &test_marshal},
     };
 
     const size_t testCount = sizeof(tests) / sizeof(tests[0]);
