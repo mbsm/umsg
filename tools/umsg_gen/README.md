@@ -10,11 +10,18 @@ python3 tools/umsg_gen/umsg_gen.py path/to/message.umsg -o generated/
 
 This writes `generated/<struct_name>.hpp`.
 
+If the schema contains a `package` directive, the output is placed under that subdirectory:
+
+- `package foo;` -> `generated/foo/<struct_name>.hpp`
+- `package foo.bar;` -> `generated/foo/bar/<struct_name>.hpp`
+
 ## Input format (restricted)
 
 A `.umsg` file contains exactly one struct:
 
 ```cpp
+package demo;
+
 struct state_t {
     uint64_t timestamp;
     double p[3];

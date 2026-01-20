@@ -1,4 +1,6 @@
 // Example message schema
+package demo;
+
 struct state_t {
     uint64_t timestamp;
     double p[3];  // position
