@@ -7,3 +7,4 @@ tests/bin/
 *.dylib
 *.exe
 *.out
+build/
