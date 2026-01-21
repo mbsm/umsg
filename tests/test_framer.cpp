@@ -1,11 +1,11 @@
-#include "tests/test_harness.hpp"
+#include "test_harness.hpp"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include "common.hpp"
-#include "framer.hpp"
+#include <umsg/common.hpp>
+#include <umsg/framer.hpp>
 
 namespace
 {
@@ -17,7 +17,7 @@ namespace
 
         Capture() : called(false), length(0) {}
 
-        void onFrame(umsg::bufferSpan frame)
+        umsg::Error onFrame(umsg::bufferSpan frame)
         {
             called = true;
             length = frame.length;
@@ -29,6 +29,7 @@ namespace
             {
                 ::memcpy(data, frame.data, length);
             }
+            return umsg::Error::OK;
         }
     };
 
@@ -42,8 +43,8 @@ namespace
         umsg::Framer<kMaxPacket> rx;
 
         Capture cap;
-        const bool cbOk = rx.registerOnPacketCallback(&cap, &Capture::onFrame);
-        UMSG_TEST_EXPECT_TRUE(ctx, cbOk);
+        const umsg::Error cbOk = rx.registerOnPacketCallback(&cap, &Capture::onFrame);
+        UMSG_TEST_EXPECT_TRUE(ctx, cbOk == umsg::Error::OK);
 
         uint8_t frameBytes[umsg::kFrameHeaderSize + 10];
         // Not necessarily a valid protocol frame; framer is agnostic.
@@ -58,16 +59,16 @@ namespace
         umsg::bufferSpan frame{frameBytes, sizeof(frameBytes)};
         umsg::bufferSpan packet{packetBytes, sizeof(packetBytes)};
 
-        const bool pktOk = tx.createPacket(frame, packet);
-        UMSG_TEST_EXPECT_TRUE(ctx, pktOk);
+        const umsg::Error pktOk = tx.createPacket(frame, packet);
+        UMSG_TEST_EXPECT_TRUE(ctx, pktOk == umsg::Error::OK);
         UMSG_TEST_EXPECT_TRUE(ctx, packet.length >= 2);
         UMSG_TEST_EXPECT_TRUE(ctx, packet.data[packet.length - 1] == 0x00);
 
         // Feed packet byte-by-byte.
         for (size_t i = 0; i < packet.length; ++i)
         {
-            const bool ok = rx.processByte(packet.data[i]);
-            UMSG_TEST_EXPECT_TRUE(ctx, ok);
+            const umsg::Error ok = rx.processByte(packet.data[i]);
+            UMSG_TEST_EXPECT_TRUE(ctx, ok == umsg::Error::OK);
         }
 
         UMSG_TEST_EXPECT_TRUE(ctx, cap.called);
@@ -85,7 +86,7 @@ namespace
         umsg::Framer<kMaxPacket> rx;
 
         Capture cap;
-        UMSG_TEST_EXPECT_TRUE(ctx, rx.registerOnPacketCallback(&cap, &Capture::onFrame));
+        UMSG_TEST_EXPECT_TRUE(ctx, rx.registerOnPacketCallback(&cap, &Capture::onFrame) == umsg::Error::OK);
 
         uint8_t frameBytes[16];
         for (size_t i = 0; i < sizeof(frameBytes); ++i)
@@ -95,7 +96,7 @@ namespace
 
         uint8_t packetBytes[kMaxPacket];
         umsg::bufferSpan packet{packetBytes, sizeof(packetBytes)};
-        UMSG_TEST_EXPECT_TRUE(ctx, tx.createPacket(umsg::bufferSpan{frameBytes, sizeof(frameBytes)}, packet));
+        UMSG_TEST_EXPECT_TRUE(ctx, tx.createPacket(umsg::bufferSpan{frameBytes, sizeof(frameBytes)}, packet) == umsg::Error::OK);
 
         // Flip one byte (not the delimiter) so CRC should fail.
         if (packet.length > 2)
@@ -106,8 +107,8 @@ namespace
         bool sawFailure = false;
         for (size_t i = 0; i < packet.length; ++i)
         {
-            const bool ok = rx.processByte(packet.data[i]);
-            if (!ok)
+            const umsg::Error ok = rx.processByte(packet.data[i]);
+            if (ok == umsg::Error::CrcMismatch)
             {
                 sawFailure = true;
                 break;

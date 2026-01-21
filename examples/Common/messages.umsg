@@ -1,0 +1,19 @@
+package messages;
+
+struct Heartbeat {
+    uint32_t uptime_ms;
+};
+
+struct SetLed {
+    bool state;
+};
+
+struct SensorReading {
+    uint32_t sensor_id;
+    float value;
+};
+
+struct RobotState {
+    uint8_t mode;
+    float battery_voltage;
+};

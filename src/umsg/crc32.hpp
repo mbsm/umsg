@@ -5,6 +5,13 @@
 /**
  * @file crc32.hpp
  * @brief CRC-32/ISO-HDLC implementation used by the wire protocol.
+ * @ingroup umsg
+ *
+ * CRC parameters (CRC-32/ISO-HDLC, Ethernet/PKZIP):
+ * - poly: 0x04C11DB7 (reflected form 0xEDB88320)
+ * - init: 0xFFFFFFFF
+ * - refin/refout: true/true
+ * - xorout: 0xFFFFFFFF
  */
 
 namespace umsg
@@ -12,7 +19,9 @@ namespace umsg
     /**
      * @brief Compute CRC-32/ISO-HDLC (aka "CRC-32", Ethernet/PKZIP).
      *
-     * Parameters: init=0xFFFFFFFF, refin/refout=true, xorout=0xFFFFFFFF.
+        * @param data Bytes to checksum (may be null only when @p length is 0).
+        * @param length Number of bytes.
+        * @return CRC32 value.
      */
     inline uint32_t crc32_iso_hdlc(const uint8_t *data, size_t length)
     {

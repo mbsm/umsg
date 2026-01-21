@@ -1,0 +1,6 @@
+package messages;
+
+struct Heartbeat {
+    uint32_t uptime_ms;
+};
+

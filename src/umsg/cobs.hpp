@@ -5,6 +5,10 @@
 /**
  * @file cobs.hpp
  * @brief Consistent Overhead Byte Stuffing (COBS) helpers.
+ * @ingroup umsg
+ *
+ * This header provides allocation-free COBS helpers used by the wire protocol.
+ * The wire delimiter (packet terminator) is handled by `Framer`, not by these helpers.
  */
 
 namespace umsg
@@ -12,7 +16,12 @@ namespace umsg
     /**
      * @brief Incremental COBS encoder (allocation-free).
      *
-     * Call begin(), then put() for each input byte, then end().
+        * Typical usage:
+        * - Call `begin()` with an output buffer.
+        * - Call `put()` for each input byte.
+        * - Call `end()` to finalize and obtain the encoded length.
+        *
+        * @note The produced encoding does not include a trailing `0x00` delimiter.
      */
     struct CobsEncoder
     {
@@ -22,7 +31,12 @@ namespace umsg
         size_t writeIndex;
         uint8_t code;
 
-        /** @brief Initialize the encoder with output buffer. */
+        /**
+         * @brief Initialize the encoder with output buffer.
+         * @param output Output buffer.
+         * @param outputCapacity Capacity of @p output in bytes.
+         * @return false if output is null (unless capacity is zero) or capacity is zero.
+         */
         bool begin(uint8_t *output, size_t outputCapacity)
         {
             out = output;
@@ -39,7 +53,10 @@ namespace umsg
             return true;
         }
 
-        /** @brief Append one input byte. Returns false if output overflows. */
+        /**
+         * @brief Append one input byte.
+         * @return false if the output buffer overflows.
+         */
         bool put(uint8_t b)
         {
             if (b == 0)
@@ -75,7 +92,10 @@ namespace umsg
             return true;
         }
 
-        /** @brief Finalize the encoding and return total output length. */
+        /**
+         * @brief Finalize the encoding.
+         * @param outputLength Output: number of encoded bytes written (delimiter not included).
+         */
         bool end(size_t &outputLength)
         {
             out[codeIndex] = code;
@@ -86,6 +106,10 @@ namespace umsg
 
     /**
      * @brief COBS-encode the concatenation of (A || B) into @p output.
+        *
+        * This is a convenience helper used by the Framer to encode `(frame || crc32)` without
+        * requiring a temporary contiguous buffer.
+        *
      * @return true on success; false if arguments are invalid or output overflows.
      */
     inline bool cobsEncode2(const uint8_t *inputA,
@@ -127,6 +151,8 @@ namespace umsg
 
     /**
      * @brief COBS-encode @p input into @p output.
+        *
+        * @note The produced encoding does not include a trailing `0x00` delimiter.
      * @return true on success; false if arguments are invalid or output overflows.
      */
     inline bool cobsEncode(const uint8_t *input,
@@ -141,9 +167,11 @@ namespace umsg
     /**
      * @brief Decode a COBS-encoded buffer in place.
      * @param buffer Buffer containing the encoded bytes; overwritten with decoded bytes.
-     * @param encodedLength Number of encoded bytes in @p buffer (delimiter not included).
+        * @param encodedLength Number of encoded bytes in @p buffer (delimiter not included).
      * @param decodedLength Output: number of decoded bytes written to @p buffer.
      * @return true on success; false if the encoding is invalid.
+        *
+        * @warning The decode is performed in-place; @p buffer must be writable.
      */
     inline bool cobsDecodeInPlace(uint8_t *buffer, size_t encodedLength, size_t &decodedLength)
     {

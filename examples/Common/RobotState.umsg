@@ -1,0 +1,2 @@
+package messages;
+struct RobotState { uint8_t mode; float battery_voltage; };

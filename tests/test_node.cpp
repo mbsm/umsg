@@ -1,10 +1,10 @@
-#include "tests/test_harness.hpp"
+#include "test_harness.hpp"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include "umsg.h"
+#include <umsg/umsg.h>
 
 namespace
 {
@@ -98,7 +98,7 @@ namespace
 
         Sink() : called(false), hash(0), payloadLen(0) {}
 
-        void onPayload(umsg::bufferSpan p, uint32_t h)
+        umsg::Error onPayload(umsg::bufferSpan p, uint32_t h)
         {
             called = true;
             hash = h;
@@ -111,6 +111,7 @@ namespace
             {
                 ::memcpy(payload, p.data, payloadLen);
             }
+            return umsg::Error::OK;
         }
     };
 
@@ -128,14 +129,14 @@ namespace
         UMSG_TEST_EXPECT_TRUE(ctx, nodeB.ok());
 
         Sink sink;
-        UMSG_TEST_EXPECT_TRUE(ctx, nodeB.registerHandler(9, &sink, &Sink::onPayload));
+        UMSG_TEST_EXPECT_TRUE(ctx, nodeB.registerHandler(9, &sink, &Sink::onPayload) == umsg::Error::OK);
 
         uint8_t payloadBytes[3] = {0x10, 0x00, 0x20};
-        const bool sent = nodeA.publish(9, 0xAABBCCDDu, umsg::bufferSpan{payloadBytes, sizeof(payloadBytes)});
-        UMSG_TEST_EXPECT_TRUE(ctx, sent);
+        const umsg::Error sent = nodeA.publish(9, 0xAABBCCDDu, umsg::bufferSpan{payloadBytes, sizeof(payloadBytes)});
+        UMSG_TEST_EXPECT_TRUE(ctx, sent == umsg::Error::OK);
 
-        const bool polled = nodeB.poll();
-        UMSG_TEST_EXPECT_TRUE(ctx, polled);
+        const size_t errors = nodeB.poll();
+        UMSG_TEST_EXPECT_EQ_SIZE(ctx, 0, errors);
 
         UMSG_TEST_EXPECT_TRUE(ctx, sink.called);
         UMSG_TEST_EXPECT_EQ_U32(ctx, 0xAABBCCDDu, sink.hash);

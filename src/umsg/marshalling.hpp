@@ -7,6 +7,13 @@
 /**
  * @file marshalling.hpp
  * @brief Canonical (network byte order) read/write helpers and zero-allocation Writer/Reader.
+ * @ingroup umsg
+ *
+ * Marshaling rules (canonical payload encoding):
+ * - All multi-byte scalars are encoded big-endian.
+ * - `bool` is encoded as 0x00 (false) or 0x01 (true); other values are invalid on decode.
+ * - `float`/`double` are transported by IEEE-754 bit pattern (written as u32/u64 big-endian).
+ * - Arrays are encoded element-by-element in increasing index order.
  */
 
 namespace umsg
@@ -91,7 +98,13 @@ namespace umsg
         }
     }
 
-    /** @brief Cursor-based writer for canonical (network byte order) encoding. */
+    /**
+     * @brief Cursor-based writer for canonical (network byte order) encoding.
+     *
+     * The Writer never allocates. Writes fail with `false` on overflow.
+     *
+     * @note This type does not modify `bufferSpan::length`; it writes up to `length` bytes.
+     */
     class Writer
     {
     public:
@@ -195,7 +208,12 @@ namespace umsg
         size_t index_;
     };
 
-    /** @brief Cursor-based reader for canonical (network byte order) decoding. */
+    /**
+     * @brief Cursor-based reader for canonical (network byte order) decoding.
+     *
+     * The Reader never allocates. Reads fail with `false` on underflow or invalid values
+     * (e.g. non-0/1 bool encodings).
+     */
     class Reader
     {
     public:

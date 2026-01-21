@@ -5,7 +5,7 @@ Small stdlib-only generator that turns `.umsg` message definitions into C++11 he
 ## Usage
 
 ```sh
-python3 tools/umsg_gen/umsg_gen.py path/to/message.umsg -o generated/
+python3 tools/umsg_gen/umsg_gen.py examples/Generator/state.umsg -o generated/
 ```
 
 This writes `generated/<struct_name>.hpp`.

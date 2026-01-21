@@ -1,4 +1,4 @@
-#include "tests/test_harness.hpp"
+#include "test_harness.hpp"
 
 #include <stdio.h>
 

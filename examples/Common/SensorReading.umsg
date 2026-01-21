@@ -1,0 +1,2 @@
+package messages;
+struct SensorReading { uint32_t sensor_id; float value; };

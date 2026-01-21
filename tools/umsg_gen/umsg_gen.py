@@ -288,7 +288,7 @@ def emit_header(msg: Message, source_path: Optional[str] = None, header_guard: O
             "",
             generated_comment.rstrip("\n"),
             "",
-            "#include \"marshalling.hpp\"",
+            "#include <umsg/marshalling.hpp>",
             "",
             *struct_lines,
             "",
