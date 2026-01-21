@@ -1,0 +1,55 @@
+Start testing: Jan 21 00:16 -03
+----------------------------------------------------------
+1/1 Testing: AllTests
+1/1 Test: AllTests
+Command: "/Users/mbustos/umsg/build/tests/umsg_tests"
+Directory: /Users/mbustos/umsg/build/tests
+"AllTests" start time: Jan 21 00:16 -03
+Output:
+----------------------------------------------------------
+
+=== RUN  crc32: CRC-32/ISO-HDLC known vectors
+---     crc32: known vector '123456789' -> 0xCBF43926
+---     crc32: empty input -> 0x00000000
+=== OK   crc32 (2 checks)
+
+=== RUN  cobs: COBS encode/decode round-trips
+---     cobs: round-trip empty buffer
+---     cobs: round-trip without zero bytes
+---     cobs: round-trip with embedded zeros
+---     cobs: round-trip large non-zero payload (exercises 0xFF blocks)
+---     cobs: round-trip large payload with sprinkled zeros
+=== OK   cobs (645 checks)
+
+=== RUN  framer: COBS+CRC framing/deframing
+---     framer: createPacket() -> processByte() emits original frame
+---     framer: CRC mismatch is rejected (no callback)
+=== OK   framer (35 checks)
+
+=== RUN  router: Frame parsing + handler dispatch
+---     router: buildFrame() + onPacket() dispatches by msg_id
+---     router: rejects frames with unexpected version
+---     router: rejects frames whose len field mismatches actual payload size
+---     router: type-safe handler registration and dispatch
+=== OK   router (23 checks)
+
+=== RUN  node: Transport integration end-to-end
+---     node: publish() on A -> poll() on B -> handler called with payload+hash
+=== OK   node (9 checks)
+
+=== RUN  marshal: Canonical payload Writer/Reader
+---     common: u64 big-endian helpers
+---     common: Writer/Reader round-trip (scalars + arrays)
+---     common: Reader rejects invalid bool
+=== OK   marshal (31 checks)
+
+ALL TESTS PASSED (745 checks)
+<end of output>
+Test time =   0.52 sec
+----------------------------------------------------------
+Test Passed.
+"AllTests" end time: Jan 21 00:16 -03
+"AllTests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Jan 21 00:16 -03
