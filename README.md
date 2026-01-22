@@ -66,7 +66,7 @@ This acts as your "single source of truth". If you change a struct, the tool reg
 The generated headers integrate directly with `umsg::Node`.
 
 ```cpp
-#include "umsg.h"
+#include <umsg/umsg.h>
 #include "generated/Telemetry.hpp"
 #include "generated/Command.hpp"
 
@@ -189,8 +189,8 @@ int main() {
 
 Since `umsg` is header-only, integration is straightforward:
 
-1. Copy the contents of the root folder (containing `.h` and `.hpp` files) to your project's include path.
-2. Include `umsg.h` in your source.
+1. Copy the contents of the `src/` folder to your project's include path.
+2. Include `<umsg/umsg.h>` in your source.
 
 ## Development & Testing
 
