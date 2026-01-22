@@ -16,7 +16,7 @@ Please keep these principles in mind when proposing changes.
 1. Fork the repository.
 2. Create a feature branch.
 3. Make your changes.
-4. Run the tests locally (`./tests/run.sh`).
+4. Run the tests locally (see below).
 5. Submit a Pull Request.
 
 ## Testing
@@ -25,7 +25,10 @@ All changes must pass the existing test suite. New features should include new t
 
 To run tests:
 ```bash
-./tests/run.sh
+mkdir -p build && cd build
+cmake ..
+make
+./tests/umsg_tests
 ```
 
 ## Coding Style

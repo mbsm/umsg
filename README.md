@@ -197,8 +197,11 @@ Since `umsg` is header-only, integration is straightforward:
 This repository includes a dependency-free test suite.
 
 ```bash
-# Run all tests
-./tests/run.sh
+# Build and run all tests
+mkdir -p build && cd build
+cmake ..
+make
+./tests/umsg_tests
 ```
 
 ## License

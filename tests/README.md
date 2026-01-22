@@ -6,7 +6,12 @@ This folder contains a small C++11 test suite for the `umsg` header-only library
 
 From the repo root:
 
-- `./tests/run.sh`
+```bash
+mkdir -p build && cd build
+cmake ..
+make
+./tests/umsg_tests
+```
 
 This compiles with:
 
@@ -96,9 +101,3 @@ Infrastructure only.
 
 - Defines the minimal test runner and verbose output format.
 - Provides simple `EXPECT_*` macros, check counting, and contextual failure reporting.
-
-### [run.sh](run.sh)
-Build-and-run helper.
-
-- Compiles the test binary with strict warnings.
-- Runs it and returns the test binary exit code.
