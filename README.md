@@ -59,14 +59,14 @@ Run the generator script included in `tools/`.
 python3 tools/umsg_gen/umsg_gen.py messages.umsg -o generated/
 ```
 
-This acts as your "single source of truth". If you change a struct, the tool regenerates the code and updates the **Schema Hash**. This hash (CRC32 of the schema definition) is sent with every message, allowing receivers to reject mismatched versions automatically.
+This acts as your "single source of truth". If you change a struct, the tool regenerates the code and updates the **Schema Hash**. This hash (FNV-1a 32-bit of the schema definition) is sent with every message, allowing receivers to reject mismatched versions automatically.
 
 ### 3. Use in Application
 
 The generated headers integrate directly with `umsg::Node`.
 
 ```cpp
-#include "umsg.h"
+#include <umsg/umsg.h>
 #include "generated/Telemetry.hpp"
 #include "generated/Command.hpp"
 
@@ -189,16 +189,19 @@ int main() {
 
 Since `umsg` is header-only, integration is straightforward:
 
-1. Copy the contents of the root folder (containing `.h` and `.hpp` files) to your project's include path.
-2. Include `umsg.h` in your source.
+1. Copy the contents of the `src/` folder to your project's include path.
+2. Include `<umsg/umsg.h>` in your source.
 
 ## Development & Testing
 
 This repository includes a dependency-free test suite.
 
 ```bash
-# Run all tests
-./tests/run.sh
+# Build and run all tests
+mkdir -p build && cd build
+cmake ..
+make
+./tests/umsg_tests
 ```
 
 ## License
