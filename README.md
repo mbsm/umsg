@@ -59,7 +59,7 @@ Run the generator script included in `tools/`.
 python3 tools/umsg_gen/umsg_gen.py messages.umsg -o generated/
 ```
 
-This acts as your "single source of truth". If you change a struct, the tool regenerates the code and updates the **Schema Hash**. This hash (CRC32 of the schema definition) is sent with every message, allowing receivers to reject mismatched versions automatically.
+This acts as your "single source of truth". If you change a struct, the tool regenerates the code and updates the **Schema Hash**. This hash (FNV-1a 32-bit of the schema definition) is sent with every message, allowing receivers to reject mismatched versions automatically.
 
 ### 3. Use in Application
 
