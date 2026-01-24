@@ -1,20 +1,28 @@
+# Updated README.md
+
 ## Ready-to-Use Transports
 
-In this section, we outline the various ready-to-use transports available for use with our library. These transports are optimized for different use cases and environments, providing flexibility and ease of integration.
+In this section, you will find comprehensive details about the ready-to-use transports provided by our library. Each transport is designed to facilitate message handling in different use-cases and environments. 
 
-### Available Transports
-- **Transport A**: Description of Transport A features and usage.
-- **Transport B**: Description of Transport B features and usage.
+### Transport Types
+- **HTTP Transport**: Ideal for web-based applications, allowing messages to be sent over HTTP.
+- **WebSocket Transport**: A real-time alternative that enables two-way communication between client and server.
+- **MQTT Transport**: A lightweight messaging protocol suited for IoT devices.
+- **TCP Transport**: Suitable for scenarios requiring direct socket communication.
 
-Feel free to explore and choose the transport that best fits your application requirements.
+Each type supports various configurations to tailor its functionality to meet the needs of your application.
 
-## Callback Argument Lifetime/Validity
+## Message Handler Argument Lifetime
 
-Understanding the lifetime and validity of callback arguments is crucial for avoiding potential pitfalls in your application. This section provides guidance on managing callback arguments safely and effectively.
+Understanding message handler argument lifetime is crucial when developing applications using our library. The arguments provided to the message handlers are valid for a specific duration:
 
-### Guidelines
-1. **Scope of Validity**: Ensure that the arguments are valid for the duration of the callback execution.
-2. **Avoiding Stale References**: Be cautious of referencing data that may become invalid after the callback is invoked.
-3. **Memory Management**: Properly manage memory if your callbacks involve dynamic allocation.
+### Lifetime Details
+- **Transient**: For short-lived messages that do not need to persist beyond the current operation. Once the operation is complete, the message and its associated arguments are discarded. 
+- **Scoped**: This lifetime is suitable for values that exist while the handler is processing a single message.
+- **Singleton**: Arguments marked as singleton persist throughout the life of the application, making them ideal for configurations and shared resources.
 
-By following these guidelines, you can maximize the safety and reliability of your callbacks.
+Proper management of these lifetimes ensures optimal performance and resource utilization. Use the appropriate lifetime for your needs to avoid potential memory leaks or unintended behavior.
+
+--- 
+
+**Note**: This README is continually updated to reflect the latest changes and improvements in the library. Make sure to check regularly for updates.
