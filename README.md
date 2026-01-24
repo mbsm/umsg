@@ -11,7 +11,11 @@ It provides a robust, zero-allocation pipeline for framing, routing, and marshal
 ## Key Features
 
 - **Freestanding-friendly**: Depends only on `<stdint.h>` and `<stddef.h>`. No OS calls, threads, or filesystem access.
-- **Zero dynamic allocation**: All buffers are fixed-size and caller-provided or statically allocated.
+- **Absolutely Zero Runtime Allocation**: All buffers are **compile-time sized using C++ templates**. No `malloc`, `new`, or dynamic memory of any kind—ever.
+  - `Node<Transport, MaxPayloadSize, MaxHandlers>` uses template parameters to instantiate fixed-size internal buffers at compile time
+  - `Framer<MaxPacketSize>` allocates a statically-sized RX buffer based on the template parameter
+  - `Router<MaxHandlers>` allocates a fixed-size handler table determined at compile time
+  - **Zero heap fragmentation, deterministic memory usage, safe for bare-metal and RTOS environments**
 - **Header-only**: Easy integration; just drop the headers into your project.
 - **Robust Framing**: Uses **COBS** (Consistent Overhead Byte Stuffing) + **CRC32** to ensure message integrity and recovery from stream corruption.
 - **Type-Safe Dispatch**: Dispatch messages to member function handlers based on IDs and Schema Hashes.
@@ -21,10 +25,30 @@ It provides a robust, zero-allocation pipeline for framing, routing, and marshal
 
 The library is composed of three main layers which can be used together or independently, plus an optional code generator:
 
-1. **Framer** (`framer.hpp`): Handles the raw byte stream. Wraps frames with COBS encoding and verifies integrity with CRC32.
-2. **Router** (`router.hpp`): Parses verified frames and dispatches them to registered handlers based on `msg_id`.
-3. **Node** (`node.hpp`): The high-level integration point. Combines a Framer and Router with a user-provided Transport.
+1. **Framer** (`framer.hpp`): Handles the raw byte stream. Wraps frames with COBS encoding and verifies integrity with CRC32. Uses a template parameter to define compile-time buffer size.
+2. **Router** (`router.hpp`): Parses verified frames and dispatches them to registered handlers based on `msg_id`. Handler storage is compile-time sized via template parameter.
+3. **Node** (`node.hpp`): The high-level integration point. Combines a Framer and Router with a user-provided Transport. **All memory allocation happens at compile time through template instantiation**—no runtime allocation whatsoever.
 4. **Generator** (`umsg_gen.py`): (Optional) Python tool that generates type-safe C++ structs from `.umsg` schema files.
+
+## Template-Based Zero Allocation Design
+
+Unlike traditional embedded communication libraries that use fixed global buffers or require you to manage memory manually, `umsg` leverages **C++ templates** to determine all buffer sizes at compile time:
+
+```cpp
+// All buffer sizes are template parameters - decided at compile time
+umsg::Node<MyTransport, 256, 8> node(transport);
+//                      ^^^  ^
+//                      |    └─ Max 8 handlers (fixed array, no dynamic allocation)
+//                      └────── Max 256-byte payload (fixed buffers sized accordingly)
+```
+
+**What this means for your embedded system:**
+- **Predictable Memory Footprint**: Run `sizeof(node)` and you know exactly how much RAM you're using—no surprises, no fragmentation.
+- **No Heap Required**: Works perfectly in environments without a heap allocator or where dynamic allocation is forbidden.
+- **Compile-Time Safety**: Buffer overflows are prevented at compile time—if your messages are too large, you'll get a compile error, not a runtime crash.
+- **Cache-Friendly**: All data structures are contiguous and stack/statically allocated, improving performance on microcontrollers.
+
+The template-based approach means you pay for exactly what you need—no more, no less—and it's all determined before your code even runs.
 
 ## Workflow with the Generator
 
@@ -59,7 +83,7 @@ Run the generator script included in `tools/`.
 python3 tools/umsg_gen/umsg_gen.py messages.umsg -o generated/
 ```
 
-This acts as your "single source of truth". If you change a struct, the tool regenerates the code and updates the **Schema Hash**. This hash (CRC32 of the schema definition) is sent with every message, allowing receivers to reject mismatched versions automatically.
+This acts as your "single source of truth". If you change a struct, the tool regenerates the code and updates the **Schema Hash**. This hash (CRC32 of the schema definition) is sent with every message to ensure both sides are using the same protocol version.
 
 ### 3. Use in Application
 
@@ -87,7 +111,13 @@ public:
 
 int main() {
     MyTransport transport;
+    
+    // Template parameters specify compile-time buffer sizes
+    // This Node uses NO dynamic allocation - everything is sized at compile time
     umsg::Node<MyTransport, 256, 8> node(transport);
+    //                      ^^^  ^
+    //                      |    └─ Support up to 8 different message handlers
+    //                      └────── Support payloads up to 256 bytes
 
     Robot robot;
     
@@ -141,6 +171,7 @@ struct MyTransport {
 int main() {
     MyTransport transport;
     // Node<Transport, MaxPayloadSize, MaxHandlers>
+    // All memory is allocated at compile time via template instantiation
     umsg::Node<MyTransport, 64, 8> node(transport);
 
     if (!node.ok()) return -1; // Initialization failed
@@ -161,7 +192,7 @@ int main() {
 
 ## Design & Protocol Specs
 
-**Constraints**: C++11, header-only, no dependencies, no dynamic memory allocation.
+**Constraints**: C++11, header-only, no dependencies, no dynamic memory allocation (ever).
 
 ### Protocol Frame Format (Application Layer)
 ```
@@ -181,9 +212,10 @@ int main() {
 - **Integrity**: Standard CRC-32 (ISO-HDLC) covers the entire frame.
 - **Endianness**: All multi-byte wire fields are Big-Endian (Network Byte Order).
 
-### Buffer Lifetime
-- **RX**: Data passed to callbacks is **zero-copy**. It points directly into the Framer's internal buffer. It is valid **only** for the duration of the callback.
-- **TX**: The user provides the data; `node.publish` copies it into an internal transmit buffer before sending to avoid lifetime issues during transport write.
+### Buffer Lifetime & Memory Model
+- **Compile-time Allocation**: All buffers are sized via template parameters. The compiler calculates exact sizes; no runtime allocation occurs.
+- **RX (Zero-Copy)**: Data passed to callbacks points directly into the Framer's internal (statically-sized) buffer. Valid **only** during the callback.
+- **TX**: User provides data; `node.publish()` copies it into an internal (statically-sized) transmit buffer before sending to avoid lifetime issues.
 
 ## Integration
 
