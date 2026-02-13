@@ -192,7 +192,7 @@ int main() {
 
 ## Design & Protocol Specs
 
-**Constraints**: C++11, header-only, no dependencies, no dynamic memory allocation (ever).
+**Constraints**: C++11, header-only, no dependencies, no dynamic memory allocation.
 
 ### Protocol Frame Format (Application Layer)
 ```
