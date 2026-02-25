@@ -11,7 +11,7 @@ It provides a robust, zero-allocation pipeline for framing, routing, and marshal
 ## Key Features
 
 - **Freestanding-friendly**: Depends only on `<stdint.h>` and `<stddef.h>`. No OS calls, threads, or filesystem access.
-- **Absolutely Zero Runtime Allocation**: All buffers are **compile-time sized using C++ templates**. No `malloc`, `new`, or dynamic memory of any kind—ever.
+- **Absolutely Zero Runtime Allocation**: All buffers are **compile-time sized using C++ templates**. No `malloc`, `new`, or dynamic memory.
   - `Node<Transport, MaxPayloadSize, MaxHandlers>` uses template parameters to instantiate fixed-size internal buffers at compile time
   - `Framer<MaxPacketSize>` allocates a statically-sized RX buffer based on the template parameter
   - `Router<MaxHandlers>` allocates a fixed-size handler table determined at compile time
