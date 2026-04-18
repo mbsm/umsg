@@ -13,103 +13,70 @@
 
 namespace umsg
 {
-    /**
-     * @brief Incremental COBS encoder (allocation-free).
-     *
-        * Typical usage:
-        * - Call `begin()` with an output buffer.
-        * - Call `put()` for each input byte.
-        * - Call `end()` to finalize and obtain the encoded length.
-        *
-        * @note The produced encoding does not include a trailing `0x00` delimiter.
-     */
-    struct CobsEncoder
+    namespace detail
     {
-        uint8_t *out;
-        size_t cap;
-        size_t codeIndex;
-        size_t writeIndex;
-        uint8_t code;
-
         /**
-         * @brief Initialize the encoder with output buffer.
-         * @param output Output buffer.
-         * @param outputCapacity Capacity of @p output in bytes.
-         * @return false if output is null (unless capacity is zero) or capacity is zero.
+         * @brief Streaming COBS encoder state. Implementation detail of the public
+         *        `cobsEncode` / `cobsEncode2` helpers below.
          */
-        bool begin(uint8_t *output, size_t outputCapacity)
+        struct CobsEncState
         {
-            out = output;
-            cap = outputCapacity;
-            codeIndex = 0;
-            writeIndex = 1;
-            code = 1;
+            uint8_t *out;
+            size_t cap;
+            size_t codeIndex;
+            size_t writeIndex;
+            uint8_t code;
 
-            if (!out || cap == 0)
+            bool begin(uint8_t *output, size_t outputCapacity)
             {
-                return false;
-            }
-            out[0] = 0;
-            return true;
-        }
-
-        /**
-         * @brief Append one input byte.
-         * @return false if the output buffer overflows.
-         */
-        bool put(uint8_t b)
-        {
-            if (b == 0)
-            {
-                out[codeIndex] = code;
-                codeIndex = writeIndex;
-                if (writeIndex >= cap)
-                {
-                    return false;
-                }
-                ++writeIndex;
+                if (!output || outputCapacity == 0) return false;
+                out = output;
+                cap = outputCapacity;
+                codeIndex = 0;
+                writeIndex = 1;
                 code = 1;
+                out[0] = 0;
                 return true;
             }
 
-            if (writeIndex >= cap)
+            bool put(uint8_t b)
             {
-                return false;
+                if (b == 0)
+                {
+                    out[codeIndex] = code;
+                    codeIndex = writeIndex;
+                    if (writeIndex >= cap) return false;
+                    ++writeIndex;
+                    code = 1;
+                    return true;
+                }
+                if (writeIndex >= cap) return false;
+                out[writeIndex++] = b;
+                if (++code == 0xFF)
+                {
+                    out[codeIndex] = code;
+                    codeIndex = writeIndex;
+                    if (writeIndex >= cap) return false;
+                    ++writeIndex;
+                    code = 1;
+                }
+                return true;
             }
-            out[writeIndex++] = b;
-            ++code;
-            if (code == 0xFF)
+
+            void finish(size_t &outputLength)
             {
                 out[codeIndex] = code;
-                codeIndex = writeIndex;
-                if (writeIndex >= cap)
-                {
-                    return false;
-                }
-                ++writeIndex;
-                code = 1;
+                outputLength = writeIndex;
             }
-            return true;
-        }
-
-        /**
-         * @brief Finalize the encoding.
-         * @param outputLength Output: number of encoded bytes written (delimiter not included).
-         */
-        bool end(size_t &outputLength)
-        {
-            out[codeIndex] = code;
-            outputLength = writeIndex;
-            return true;
-        }
-    };
+        };
+    }
 
     /**
      * @brief COBS-encode the concatenation of (A || B) into @p output.
-        *
-        * This is a convenience helper used by the Framer to encode `(frame || crc32)` without
-        * requiring a temporary contiguous buffer.
-        *
+     *
+     * Used by the Framer to encode `(frame || crc32)` without a temporary contiguous buffer.
+     * The produced encoding does not include a trailing `0x00` delimiter.
+     *
      * @return true on success; false if arguments are invalid or output overflows.
      */
     inline bool cobsEncode2(const uint8_t *inputA,
@@ -120,39 +87,29 @@ namespace umsg
                             size_t outputCapacity,
                             size_t &outputLength)
     {
-        if ((!inputA && inputALength) || (!inputB && inputBLength))
-        {
-            return false;
-        }
+        if ((!inputA && inputALength) || (!inputB && inputBLength)) return false;
 
-        CobsEncoder enc;
-        if (!enc.begin(output, outputCapacity))
-        {
-            return false;
-        }
+        detail::CobsEncState enc;
+        if (!enc.begin(output, outputCapacity)) return false;
 
         for (size_t i = 0; i < inputALength; ++i)
         {
-            if (!enc.put(inputA[i]))
-            {
-                return false;
-            }
+            if (!enc.put(inputA[i])) return false;
         }
         for (size_t i = 0; i < inputBLength; ++i)
         {
-            if (!enc.put(inputB[i]))
-            {
-                return false;
-            }
+            if (!enc.put(inputB[i])) return false;
         }
 
-        return enc.end(outputLength);
+        enc.finish(outputLength);
+        return true;
     }
 
     /**
      * @brief COBS-encode @p input into @p output.
-        *
-        * @note The produced encoding does not include a trailing `0x00` delimiter.
+     *
+     * The produced encoding does not include a trailing `0x00` delimiter.
+     *
      * @return true on success; false if arguments are invalid or output overflows.
      */
     inline bool cobsEncode(const uint8_t *input,
