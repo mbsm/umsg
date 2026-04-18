@@ -57,7 +57,6 @@ Advanced users can also use a handful of components on their own —
 - [Architecture](docs/architecture.md) — layering, file roles, wire protocol, memory model
 - [Usage guide](docs/usage.md) — transports, subscribe/publish, error codes, CRC options, build
 - [Schema generator](tools/umsg_gen/README.md) — `.umsg` → C++ structs with typed `encode`/`decode`
-- [Changelog](docs/changelog.md)
 
 ---
 
@@ -78,7 +77,6 @@ ctest --test-dir build --output-on-failure
 ## Status
 
 Pre-1.0 and actively evolving — APIs may change between minor versions.
-See the [changelog](docs/changelog.md) for migration notes.
 
 ## License
 
