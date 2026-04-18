@@ -81,7 +81,7 @@ public:
         
         if (len > 0) {
             // We got a packet
-            bufLen_ = len;
+            bufLen_ = static_cast<size_t>(len);
             bufIdx_ = 0;
             byte = rxBuffer_[bufIdx_++];
             // Optional: capture sender addr if we want to reply? 
@@ -96,7 +96,7 @@ public:
         if (fd_ < 0 || !hasDest_) return false;
         
         ssize_t sent = ::sendto(fd_, data, length, 0, (struct sockaddr*)&destAddr_, sizeof(destAddr_));
-        return (sent == (ssize_t)length);
+        return (sent >= 0 && static_cast<size_t>(sent) == length);
     }
 
 private:
@@ -113,8 +113,8 @@ private:
     // UDP is datagram based, but Node expects a stream of bytes.
     // We must buffer the current datagram.
     uint8_t rxBuffer_[4096];
-    ssize_t bufLen_;
-    ssize_t bufIdx_;
+    size_t bufLen_;
+    size_t bufIdx_;
 };
 
 } // namespace posix
