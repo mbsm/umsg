@@ -53,6 +53,10 @@ Use the generator (`tools/umsg_gen/`) or hand-roll a struct that exposes
 `bool decode(ByteSpan in)`:
 
 ```cpp
+// Message channels (shared between sender and receiver).
+constexpr uint8_t kCmdChannel       = 10;
+constexpr uint8_t kTelemetryChannel = 11;
+
 class Robot {
 public:
     umsg::Error onCommand(const Command& cmd) {
@@ -63,27 +67,30 @@ public:
 };
 
 Robot robot;
-node.subscribe(/*msg_id*/ 10, &robot, &Robot::onCommand);
+node.subscribe(kCmdChannel, &robot, &Robot::onCommand);
 
 while (true) {
     node.poll();        // drain transport, decode, dispatch
     Telemetry t;
     t.timestamp_us = now_us();
-    node.publish(/*msg_id*/ 11, t);
+    node.publish(kTelemetryChannel, t);
 }
 ```
 
 ### Raw subscribe / publish (no generator)
 
 ```cpp
+constexpr uint8_t kRawChannel = 10;
+constexpr uint32_t kRawSchemaHash = 0x12345678u;
+
 struct Raw {
     umsg::Error onMsg(umsg::ByteSpan payload, uint32_t msgHash) { /* … */ }
 };
 Raw r;
-node.subscribe(10, &r, &Raw::onMsg);
+node.subscribe(kRawChannel, &r, &Raw::onMsg);
 
 uint8_t bytes[] = {0x01, 0x02, 0x03};
-node.publish(10, /*msg_hash*/ 0x12345678u, umsg::ByteSpan{bytes, sizeof(bytes)});
+node.publish(kRawChannel, kRawSchemaHash, umsg::ByteSpan{bytes, sizeof(bytes)});
 ```
 
 Only one handler per `msg_id`; re-subscribing replaces the previous binding.

@@ -25,6 +25,10 @@ to message ids, and call `poll()` / `publish()`.
 ```cpp
 #include <umsg/umsg.h>
 
+// Message channels (shared between sender and receiver).
+constexpr uint8_t kCmdChannel       = 10;
+constexpr uint8_t kTelemetryChannel = 11;
+
 struct Robot {
     umsg::Error onCommand(const Command& cmd) {
         moveTo(cmd.target_pos);          // schema + decode already checked
@@ -36,11 +40,11 @@ MyTransport transport;
 umsg::Node<MyTransport, /*MaxPayloadSize*/ 256, /*MaxHandlers*/ 8> node(transport);
 
 Robot robot;
-node.subscribe(10, &robot, &Robot::onCommand);
+node.subscribe(kCmdChannel, &robot, &Robot::onCommand);
 
 while (true) {
     node.poll();                         // drain, decode, dispatch
-    node.publish(11, Telemetry{now_us(), ...});
+    node.publish(kTelemetryChannel, Telemetry{now_us(), ...});
 }
 ```
 
