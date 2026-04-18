@@ -70,6 +70,14 @@ namespace umsg
 
         /**
          * @brief Drain available bytes from the transport and dispatch complete frames.
+         *
+         * Byte-level framing errors (`CobsInvalid`, `CrcInvalid`, `FrameOverflow`),
+         * protocol errors (`VersionMismatch`, `LengthMismatch`, `FrameTooShort`), and
+         * handler return values are intentionally discarded here — the handler is the
+         * right place to observe message-level outcomes, and framing-level errors only
+         * matter to application code in aggregate (see `Framer::feed` if you need
+         * per-byte diagnostics).
+         *
          * @return Number of bytes consumed from the transport this call.
          */
         size_t poll()
