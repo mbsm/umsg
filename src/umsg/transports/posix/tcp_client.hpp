@@ -4,22 +4,25 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <string.h>
-#include <stdio.h>
 #include <errno.h>
+#include <stddef.h>
+#include <stdint.h>
 
 namespace umsg {
 namespace posix {
 
 /**
  * @brief Simple POSIX TCP Client Transport.
- * 
- * Non-blocking reads, blocking writes (by default, unless socket is tweaked).
+ *
+ * Non-blocking reads (buffered to avoid one syscall per byte); blocking writes
+ * that wait on `poll()` when the send buffer is full instead of busy-spinning.
  */
 class TcpClient {
 public:
-    TcpClient() : fd_(-1) {}
-    
+    TcpClient() : fd_(-1), bufLen_(0), bufIdx_(0) {}
+
     ~TcpClient() {
         close();
     }
@@ -45,7 +48,6 @@ public:
             return false;
         }
 
-        // Set non-blocking for reads
         int flags = ::fcntl(fd_, F_GETFL, 0);
         if (flags == -1) {
             close();
@@ -56,6 +58,8 @@ public:
             return false;
         }
 
+        bufLen_ = 0;
+        bufIdx_ = 0;
         return true;
     }
 
@@ -64,49 +68,70 @@ public:
             ::close(fd_);
             fd_ = -1;
         }
+        bufLen_ = 0;
+        bufIdx_ = 0;
     }
 
     bool isOpen() const { return fd_ >= 0; }
 
     bool read(uint8_t& byte) {
         if (fd_ < 0) return false;
-        
-        ssize_t n = ::read(fd_, &byte, 1);
-        if (n > 0) return true;
-        
-        // n == 0 means EOF (server closed). n < 0 means error or EAGAIN.
-        // For simplicity, we just return false here (no byte).
-        // Real logic might want to handle EOF differently, but Node.poll() 
-        // essentially just wants "is there a byte now?".
-        return false;
+
+        if (bufIdx_ < bufLen_) {
+            byte = rxBuffer_[bufIdx_++];
+            return true;
+        }
+
+        ssize_t n;
+        do {
+            n = ::read(fd_, rxBuffer_, sizeof(rxBuffer_));
+        } while (n < 0 && errno == EINTR);
+
+        if (n <= 0) {
+            // n == 0: peer closed; n < 0 with EAGAIN: nothing to read now.
+            return false;
+        }
+
+        bufLen_ = static_cast<size_t>(n);
+        bufIdx_ = 0;
+        byte = rxBuffer_[bufIdx_++];
+        return true;
     }
 
     bool write(const uint8_t* data, size_t length) {
         if (fd_ < 0) return false;
-        
-        // Loop until all bytes written or error
+
         size_t total = 0;
         while (total < length) {
             ssize_t n = ::write(fd_, data + total, length - total);
             if (n < 0) {
-                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                     continue; // Spin or return false? 
-                     // Blocking write behavior is requested by standard umsg semantics 
-                     // ("returns true if all bytes written").
-                     // But we set O_NONBLOCK. So we might need to select() properly.
-                     // For this simple helper, maybe we should just fail or busy-wait.
-                     // Let's retry lightly.
-                     continue; 
-                 }
-                 return false;
+                if (errno == EINTR) continue;
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // Wait for send buffer space instead of busy-spinning.
+                    struct pollfd pfd;
+                    pfd.fd = fd_;
+                    pfd.events = POLLOUT;
+                    int pr;
+                    do {
+                        pr = ::poll(&pfd, 1, -1);
+                    } while (pr < 0 && errno == EINTR);
+                    if (pr < 0) return false;
+                    continue;
+                }
+                return false;
             }
-            total += n;
+            total += static_cast<size_t>(n);
         }
         return true;
     }
 
 private:
     int fd_;
+
+    // Buffer incoming bytes so read() doesn't syscall per byte.
+    uint8_t rxBuffer_[512];
+    size_t bufLen_;
+    size_t bufIdx_;
 };
 
 } // namespace posix
