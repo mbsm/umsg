@@ -8,4 +8,18 @@ tests/bin/
 *.exe
 *.out
 build/
+build-*/
 .github
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Claude Code / AI assistants
+.claude/
+CLAUDE.md
+.aider*
+.cursor/
