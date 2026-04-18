@@ -4,8 +4,6 @@
 ![Standard: C++11](https://img.shields.io/badge/Standard-C%2B%2B11-blue.svg)
 ![Status: Beta](https://img.shields.io/badge/Status-Beta-orange.svg)
 
-**Author:** Matias Bustos SM
-
 Minimal, header-only C++11 messaging for embedded systems. Zero heap, COBS +
 CRC32 framing, typed pub/sub over any byte-stream transport (UART, TCP, UDP).
 
@@ -81,6 +79,10 @@ ctest --test-dir build --output-on-failure
 ## Status
 
 Pre-1.0 and actively evolving — APIs may change between minor versions.
+
+## Author
+
+Matias Bustos SM
 
 ## License
 
