@@ -1,104 +1,76 @@
 # umsg tests
 
-This folder contains a small C++11 test suite for the `umsg` header-only library.
+A small, dependency-free C++11 test suite for the `umsg` header-only library.
 
 ## Running
 
 From the repo root:
 
-- `./tests/run.sh`
+```bash
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
 
-This compiles with:
+Or run the binary directly for the per-check output:
 
-- `-std=c++11 -Wall -Wextra -Werror -pedantic`
+```bash
+./build/tests/umsg_tests
+```
 
-and runs a single test binary.
+Compiles with `-std=c++11 -Wall -Wextra -Werror -pedantic`.
 
 ## Output format
 
-The harness prints:
-
-- `=== RUN <test>`: start of a logical test group
-- `--- <section>`: a short description of a sub-check inside the test group
-- `=== OK <test>` / `=== FAIL <test>`: summary including number of checks
-
-Failures include `[test]` and `[section]` tags plus file/line.
+- `=== RUN <test>` — start of a logical test group
+- `--- <section>` — a single check or sub-check within the group
+- `=== OK <test>` / `=== FAIL <test>` — per-group summary (check count)
+- Failures include `[test]` and `[section]` tags plus `file:line`
 
 ## Test inventory
 
 ### [test_crc32.cpp](test_crc32.cpp)
-Validates the CRC implementation used by the wire protocol.
+CRC-32/ISO-HDLC correctness against known vectors.
 
-- CRC-32/ISO-HDLC known vector: the ASCII string `"123456789"` must produce `0xCBF43926`.
-- Empty input must produce `0x00000000`.
+- `"123456789"` → `0xCBF43926`
+- empty input → `0x00000000`
 
-Why this matters: the Framer uses CRC to accept/reject packets; if this is wrong, no messages will decode reliably.
+Why it matters: framing decisions depend on CRC. The same vectors run against
+the default, `UMSG_CRC32_NIBBLE_TABLE`, and `UMSG_CRC32_BYTE_TABLE` builds.
 
 ### [test_cobs.cpp](test_cobs.cpp)
-Validates COBS encoding/decoding behavior.
+COBS encode/decode round-trips.
 
-- Round-trip: `decode(encode(x)) == x` for:
-  - empty input
-  - non-zero data
-  - data containing embedded zeros
-  - larger payloads that force `0xFF` code blocks
-- Additional invariant: encoded bytes contain no `0x00` (the delimiter value).
+- `decode(encode(x)) == x` for empty, non-zero, embedded-zero, and long inputs (forces `0xFF` blocks)
+- Encoded bytes never contain `0x00`
 
-Why this matters: the wire packet uses `0x00` as the delimiter, so COBS must ensure the payload never contains zeros.
+Why it matters: `0x00` is the packet delimiter, so COBS must never produce one.
 
 ### [test_framer.cpp](test_framer.cpp)
-Validates the Framer framing/deframing pipeline (COBS + CRC + delimiter).
+COBS + CRC framing pipeline via `Framer::encode` and `Framer::feed`.
 
-- Round-trip:
-  - `createPacket(frame)` generates a valid wire packet (ends with delimiter `0x00`).
-  - Feeding that packet byte-by-byte into `processByte()` eventually emits the original frame.
-- CRC rejection:
-  - Flipping a byte in the encoded packet causes `processByte()` to fail and the callback is not invoked.
+- Round-trip: `encode(frame) → feed(byte)*` recovers the original frame via `Result{complete=true, frame}`
+- CRC rejection: flipping one byte in the encoded packet produces `Error::CrcInvalid` and no `complete` result
 
-Why this matters: this is the core integrity and packet-boundary logic.
+Framer is frame-agnostic: it does not validate the inner protocol header.
 
-Notes:
-- The Framer is frame-agnostic: it treats the frame as bytes and does not validate `version/msg_id/len`.
+### [test_dispatcher.cpp](test_dispatcher.cpp)
+Frame codec (`protocol::encodeFrame` / `decodeFrame`) and handler dispatch (`Dispatcher`).
 
-### [test_router.cpp](test_router.cpp)
-Validates protocol frame construction and parsing/dispatch.
-
-- `buildFrame()` produces:
-  - `version(1) | msg_id(1) | msg_hash(4) | len(2) | payload(len)`
-  - network byte order (big-endian) for `msg_hash` and `len`
-- `onPacket(frame)` parsing and dispatch:
-  - dispatches to the handler registered for `msg_id`
-  - passes `(payloadSpan, msgHash)` to the handler
-- Rejection behavior:
-  - frames with unexpected `version` are ignored
-  - frames where the header `len` does not match `frame.length` are ignored
-
-Why this matters: Router is responsible for protocol correctness and for delivering payload/hash to the correct handler.
+- `encodeFrame` emits `version(1) | msg_id(1) | msg_hash(4) | len(2) | payload` in big-endian
+- `decodeFrame` rejects `LengthMismatch`
+- `Dispatcher::dispatch` routes by `msg_id` and returns `HandlerNotFound` for unknown ids
+- Typed handlers verify `Msg::kMsgHash` (returning `HashMismatch` on mismatch) and auto-decode
 
 ### [test_node.cpp](test_node.cpp)
-Validates end-to-end integration of Transport + Framer + Router.
+End-to-end integration with an in-memory duplex transport.
 
-It constructs a fake in-memory duplex transport (two fixed-size ring buffers) and connects two `Node` instances:
+- `nodeA.publish(msg_id, msg_hash, payload)` writes a wire packet into the A→B ring
+- `nodeB.poll()` drains the ring, runs the Framer + Dispatcher pipeline, invokes the handler
+- The handler receives the exact payload (including an embedded `0x00` to exercise COBS) and the hash
 
-- `nodeA.publish(msgId, msgHash, payload)` writes a wire packet into the A→B ring.
-- `nodeB.poll()` drains bytes from its transport, feeding them into its Framer.
-- When a full packet is received and CRC passes, the Framer calls `Router::onPacket()`, and Router dispatches to the registered handler.
+### [test_marshal.cpp](test_marshal.cpp)
+`Writer` / `Reader` round-trips for scalars and arrays; big-endian endian helpers.
 
-Assertions:
-- `nodeA.ok()` / `nodeB.ok()` are true (Framer→Router callback wiring succeeded).
-- `nodeB` handler is called exactly once.
-- Handler receives the expected `msgHash` and the exact payload bytes (including an embedded `0x00` to exercise COBS).
-
-Why this matters: Node is the “user-facing” integration point; this test proves the pieces work together without OS I/O or third-party dependencies.
-
-### [test_main.cpp](test_main.cpp) and [test_harness.hpp](test_harness.hpp)
-Infrastructure only.
-
-- Defines the minimal test runner and verbose output format.
-- Provides simple `EXPECT_*` macros, check counting, and contextual failure reporting.
-
-### [run.sh](run.sh)
-Build-and-run helper.
-
-- Compiles the test binary with strict warnings.
-- Runs it and returns the test binary exit code.
+### [test_main.cpp](test_main.cpp) / [test_harness.hpp](test_harness.hpp)
+Minimal test runner, `EXPECT_*` macros, check counting, contextual failure reporting.

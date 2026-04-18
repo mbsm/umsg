@@ -30,7 +30,7 @@ static const uint32_t MSG_HEARTBEAT_ID = 1;
 static const uint32_t MSG_SET_LED_ID = 4;
 
 // --- 2. Hardware / Led Controller ---
-// Since registerHandler requires a member function, we group logic here.
+// node.subscribe() takes a member function pointer, so handler logic lives in a struct.
 struct Controller
 {
     void setup()
@@ -40,8 +40,7 @@ struct Controller
 
     umsg::Error onSetLed(const messages::SetLed &msg)
     {
-        // 1. Schema Hash checked automatically by Node/Router
-        // 2. Decode performed automatically by Node/Router
+        // Schema hash check and decode are handled by the Dispatcher.
 
         // 3. Act
         digitalWrite(LED_BUILTIN, msg.state ? HIGH : LOW);
@@ -63,15 +62,8 @@ void setup()
 
     controller.setup();
 
-    if (!node.ok())
-    {
-        Serial.println("Node init failed!");
-        while (1)
-            ;
-    }
-
     // Register Handler: bind ID 4 -> Controller::onSetLed
-    if (node.registerHandler(MSG_SET_LED_ID, &controller, &Controller::onSetLed) != umsg::Error::OK)
+    if (node.subscribe(MSG_SET_LED_ID, &controller, &Controller::onSetLed) != umsg::Error::OK)
     {
         Serial.println("Handler registration failed");
     }

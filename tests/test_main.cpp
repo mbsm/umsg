@@ -5,7 +5,7 @@
 void test_crc32(umsg_test::TestContext &ctx);
 void test_cobs(umsg_test::TestContext &ctx);
 void test_framer(umsg_test::TestContext &ctx);
-void test_router(umsg_test::TestContext &ctx);
+void test_dispatcher(umsg_test::TestContext &ctx);
 void test_node(umsg_test::TestContext &ctx);
 void test_marshal(umsg_test::TestContext &ctx);
 
@@ -24,7 +24,7 @@ int main()
         {"crc32", "CRC-32/ISO-HDLC known vectors", &test_crc32},
         {"cobs", "COBS encode/decode round-trips", &test_cobs},
         {"framer", "COBS+CRC framing/deframing", &test_framer},
-        {"router", "Frame parsing + handler dispatch", &test_router},
+        {"dispatcher", "Frame codec + handler dispatch", &test_dispatcher},
         {"node", "Transport integration end-to-end", &test_node},
         {"marshal", "Canonical payload Writer/Reader", &test_marshal},
     };

@@ -20,7 +20,7 @@ struct SensorReading
     static const uint32_t kMsgHash = 0x4DF97BD2u;
     static const size_t kPayloadSize = sizeof(uint32_t) + sizeof(float);
 
-    bool encode(umsg::bufferSpan& payload) const
+    bool encode(umsg::ByteSpan& payload) const
     {
         if (!payload.data) return false;
         const size_t cap = payload.length;
@@ -32,7 +32,7 @@ struct SensorReading
         return true;
     }
 
-    bool decode(umsg::bufferSpan payload)
+    bool decode(umsg::ByteSpan payload)
     {
         if (payload.length < kPayloadSize) return false;
         umsg::Reader r(payload);

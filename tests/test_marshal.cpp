@@ -42,7 +42,7 @@ namespace
         UMSG_TEST_SECTION(ctx, "common: Writer/Reader round-trip (scalars + arrays)");
 
         uint8_t buf[128];
-        umsg::Writer w(umsg::bufferSpan{buf, sizeof(buf)});
+        umsg::Writer w(umsg::ByteSpan{buf, sizeof(buf)});
 
         const uint8_t u8 = 0xA5;
         const int16_t i16 = -1234;
@@ -65,7 +65,7 @@ namespace
         const size_t n = w.bytesWritten();
         UMSG_TEST_EXPECT_TRUE(ctx, n > 0);
 
-        umsg::Reader r(umsg::bufferSpan{buf, n});
+        umsg::Reader r(umsg::ByteSpan{buf, n});
 
         uint8_t u8_r = 0;
         int16_t i16_r = 0;
@@ -104,7 +104,7 @@ namespace
         UMSG_TEST_SECTION(ctx, "common: Reader rejects invalid bool");
 
         uint8_t buf[1] = {2};
-        umsg::Reader r(umsg::bufferSpan{buf, sizeof(buf)});
+        umsg::Reader r(umsg::ByteSpan{buf, sizeof(buf)});
 
         bool b = false;
         UMSG_TEST_EXPECT_TRUE(ctx, !r.read(b));

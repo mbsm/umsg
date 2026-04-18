@@ -19,7 +19,7 @@ struct SetLed
     static const uint32_t kMsgHash = 0x18E29F44u;
     static const size_t kPayloadSize = sizeof(bool);
 
-    bool encode(umsg::bufferSpan& payload) const
+    bool encode(umsg::ByteSpan& payload) const
     {
         if (!payload.data) return false;
         const size_t cap = payload.length;
@@ -30,7 +30,7 @@ struct SetLed
         return true;
     }
 
-    bool decode(umsg::bufferSpan payload)
+    bool decode(umsg::ByteSpan payload)
     {
         if (payload.length < kPayloadSize) return false;
         umsg::Reader r(payload);

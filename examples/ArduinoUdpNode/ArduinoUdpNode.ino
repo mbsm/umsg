@@ -60,7 +60,7 @@ void setup() {
 
     udpParams.begin(LOCAL_PORT);
     
-    if (node.registerHandler(MSG_SET_LED, &controller, &Controller::onSetLed) != umsg::Error::OK) {
+    if (node.subscribe(MSG_SET_LED, &controller, &Controller::onSetLed) != umsg::Error::OK) {
         Serial.println("Handler registration failed");
     }
 }

@@ -30,11 +30,6 @@ int main(int argc, char** argv) {
     // Create the Node with 64-byte RX buffer, 4 max handlers
     umsg::Node<umsg::posix::SerialPort, 64, 4> node(port);
 
-    if (!node.ok()) {
-        std::cerr << "Node initialization failed" << std::endl;
-        return 1;
-    }
-
     // Message ID for SetLed (must match Arduino)
     const uint32_t MSG_SET_LED = 4;
     

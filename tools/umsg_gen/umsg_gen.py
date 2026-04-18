@@ -232,7 +232,7 @@ def emit_header(msg: Message, source_path: Optional[str] = None, header_guard: O
     struct_lines.append("")
 
     # encode/decode use capacity-in/length-out for encode.
-    struct_lines.append("    bool encode(umsg::bufferSpan& payload) const")
+    struct_lines.append("    bool encode(umsg::ByteSpan& payload) const")
     struct_lines.append("    {")
     struct_lines.append("        if (!payload.data) return false;")
     struct_lines.append("        const size_t cap = payload.length;")
@@ -250,7 +250,7 @@ def emit_header(msg: Message, source_path: Optional[str] = None, header_guard: O
     struct_lines.append("    }")
     struct_lines.append("")
 
-    struct_lines.append("    bool decode(umsg::bufferSpan payload)")
+    struct_lines.append("    bool decode(umsg::ByteSpan payload)")
     struct_lines.append("    {")
     struct_lines.append("        if (payload.length < kPayloadSize) return false;")
     struct_lines.append("        umsg::Reader r(payload);")

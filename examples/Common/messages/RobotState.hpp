@@ -20,7 +20,7 @@ struct RobotState
     static const uint32_t kMsgHash = 0x6F95B45Au;
     static const size_t kPayloadSize = sizeof(uint8_t) + sizeof(float);
 
-    bool encode(umsg::bufferSpan& payload) const
+    bool encode(umsg::ByteSpan& payload) const
     {
         if (!payload.data) return false;
         const size_t cap = payload.length;
@@ -32,7 +32,7 @@ struct RobotState
         return true;
     }
 
-    bool decode(umsg::bufferSpan payload)
+    bool decode(umsg::ByteSpan payload)
     {
         if (payload.length < kPayloadSize) return false;
         umsg::Reader r(payload);

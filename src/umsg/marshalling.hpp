@@ -1,6 +1,7 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "common.hpp"
 
@@ -78,22 +79,12 @@ namespace umsg
 
     namespace detail
     {
-        inline void copy_bytes(void *dst, const void *src, size_t n)
-        {
-            uint8_t *d = static_cast<uint8_t *>(dst);
-            const uint8_t *s = static_cast<const uint8_t *>(src);
-            for (size_t i = 0; i < n; ++i)
-            {
-                d[i] = s[i];
-            }
-        }
-
         template <class To, class From>
         inline To bit_cast(const From &from)
         {
             static_assert(sizeof(To) == sizeof(From), "bit_cast size mismatch");
             To to;
-            copy_bytes(&to, &from, sizeof(To));
+            ::memcpy(&to, &from, sizeof(To));
             return to;
         }
     }
@@ -103,12 +94,12 @@ namespace umsg
      *
      * The Writer never allocates. Writes fail with `false` on overflow.
      *
-     * @note This type does not modify `bufferSpan::length`; it writes up to `length` bytes.
+     * @note This type does not modify `ByteSpan::length`; it writes up to `length` bytes.
      */
     class Writer
     {
     public:
-        explicit Writer(bufferSpan out) : out_(out), index_(0) {}
+        explicit Writer(ByteSpan out) : out_(out), index_(0) {}
 
         size_t bytesWritten() const { return index_; }
 
@@ -204,7 +195,7 @@ namespace umsg
             return (index_ + n) <= out_.length;
         }
 
-        bufferSpan out_;
+        ByteSpan out_;
         size_t index_;
     };
 
@@ -217,7 +208,7 @@ namespace umsg
     class Reader
     {
     public:
-        explicit Reader(bufferSpan in) : in_(in), index_(0) {}
+        explicit Reader(ByteSpan in) : in_(in), index_(0) {}
 
         bool fullyConsumed() const { return index_ == in_.length; }
 
@@ -372,7 +363,7 @@ namespace umsg
             return (index_ + n) <= in_.length;
         }
 
-        bufferSpan in_;
+        ByteSpan in_;
         size_t index_;
     };
 }

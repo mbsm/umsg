@@ -3,55 +3,33 @@
 #include <stdint.h>
 
 #include "common.hpp"
+#include "dispatcher.hpp"
 #include "framer.hpp"
-#include "router.hpp"
+#include "protocol.hpp"
 
 /**
  * @file node.hpp
- * @brief High-level integration: Framer + Router + user transport.
+ * @brief High-level integration: transport + Framer + protocol codec + Dispatcher.
  * @ingroup umsg
- *
- * `umsg::Node` is the primary integration object (and typical entry point) for application usage:
- *
- * - RX: drain bytes from a transport, feed them into `Framer::processByte()`, and dispatch
- *   complete frames via `Router`.
- * - TX: build a frame via `Router::buildFrame()`, wrap it into a COBS+CRC32 packet via
- *   `Framer::createPacket()`, then write it to the transport.
- *
- * This library is header-only, C++11, freestanding-friendly, and does not allocate.
  */
 
 namespace umsg
 {
     /**
-     * @brief Integrates `Framer + Router` with a user-provided transport.
+     * @brief Integrates a transport, a `Framer`, and a `Dispatcher`.
      *
-     * @tparam Transport User type implementing the transport concept.
-     * @tparam MaxPayloadSize Maximum payload size (bytes) for frames built/accepted.
-     * @tparam MaxHandlers Maximum number of Router handlers to register.
-     *
-     * Transport concept (minimal):
-     * - `bool read(uint8_t& byte)`
-     *   - Non-blocking.
-     *   - Returns `true` and sets `byte` when a byte is available.
-     *   - Returns `false` when no more bytes are available right now.
-     * - `bool write(const uint8_t* data, size_t length)`
-     *   - Returns `true` if all bytes were written.
+     * @tparam Transport User type with `bool read(uint8_t&)` and `bool write(const uint8_t*, size_t)`.
+     * @tparam MaxPayloadSize Maximum payload size for frames built/accepted.
+     * @tparam MaxHandlers Maximum number of handlers to register.
      *
      * Lifecycle:
-     * - Construct a `Node`, then check `ok()`.
-     * - Register handlers using `registerHandler()`.
-     * - Periodically call `poll()` to receive/dispatch.
-     * - Use `publish()` to transmit.
+     * - Construct with a transport reference.
+     * - Register handlers via `on()`.
+     * - Call `poll()` periodically; call `publish()` to transmit.
      *
-     * @note `ok()` can be false if the underlying Framer callback wiring fails (the Framer
-     *       uses a fixed-size buffer to store a member-function pointer representation).
-     *
-     * Buffer lifetime / reentrancy:
-     * - RX handler arguments (`bufferSpan`) alias the Framer’s internal RX buffer.
-     *   They are only valid during the callback call stack.
-     * - Do not call `poll()` (or `Framer::processByte()`) re-entrantly from inside a handler.
-     * - TX uses internal fixed-size buffers; `publish()` is not re-entrant.
+     * Reentrancy:
+     * - Do not call `poll()` recursively from a handler.
+     * - `publish()` is not re-entrant (uses internal fixed-size scratch).
      */
     template <class Transport, size_t MaxPayloadSize, size_t MaxHandlers>
     class Node
@@ -61,94 +39,77 @@ namespace umsg
         static const size_t kMaxPacketSize = umsg::maxPacketSize(MaxPayloadSize);
 
         typedef umsg::Framer<kMaxPacketSize> FramerType;
-        typedef umsg::Router<MaxHandlers> RouterType;
+        typedef umsg::Dispatcher<MaxHandlers> DispatcherType;
 
         explicit Node(Transport &transport, uint8_t expectedVersion = 1)
-            : transport_(transport), router_(expectedVersion)
-        {
-            // Wire framer -> router.
-            wired_ = (framer_.registerOnPacketCallback(&router_, &RouterType::onPacket) == Error::OK);
-        }
-
-        FramerType &framer() { return framer_; }
-        RouterType &router() { return router_; }
-
-        /** @brief True if Framer->Router callback wiring succeeded. */
-        bool ok() const { return wired_; }
+            : transport_(transport), expectedVersion_(expectedVersion) {}
 
         /**
-         * @brief Drain available bytes from the transport and feed them into the framer.
+         * @brief Subscribe a raw handler to @p msgId.
          *
-         * This method is intended to be called periodically (e.g., in your main loop).
+         * Only one handler per `msgId`; re-subscribing replaces the previous handler.
+         */
+        template <class T>
+        Error subscribe(uint8_t msgId, T *obj,
+                        Error (T::*method)(ByteSpan payload, uint32_t msgHash))
+        {
+            return dispatcher_.registerHandler(msgId, obj, method);
+        }
+
+        /**
+         * @brief Subscribe a typed handler to @p msgId (auto-checks `Msg::kMsgHash`
+         *        and calls `Msg::decode`).
          *
-         * @return Number of errors encountered (framing, CRC, or dispatch).
+         * Only one handler per `msgId`; re-subscribing replaces the previous handler.
+         */
+        template <class T, class Msg>
+        Error subscribe(uint8_t msgId, T *obj, Error (T::*method)(const Msg &msg))
+        {
+            return dispatcher_.registerHandler(msgId, obj, method);
+        }
+
+        /**
+         * @brief Drain available bytes from the transport and dispatch complete frames.
+         * @return Number of bytes consumed from the transport this call.
          */
         size_t poll()
         {
-            if (!wired_)
-            {
-                return 0;
-            }
-
-            size_t errors = 0;
+            size_t bytes = 0;
             uint8_t byte = 0;
             while (transport_.read(byte))
             {
-                if (framer_.processByte(byte) != Error::OK)
+                ++bytes;
+                typename FramerType::Result r = framer_.feed(byte);
+                if (r.complete)
                 {
-                    errors++;
+                    protocol::Header h;
+                    ByteSpan payload;
+                    if (protocol::decodeFrame(r.frame, h, payload) != Error::OK)
+                    {
+                        continue;
+                    }
+                    if (h.version != expectedVersion_)
+                    {
+                        continue;
+                    }
+                    dispatcher_.dispatch(h.msgId, h.msgHash, payload);
                 }
             }
-            return errors;
+            return bytes;
         }
 
-        /**
-         * @brief Convenience wrapper for Router handler registration.
-         *
-         * Handler signature:
-         * - `Error (T::*)(umsg::bufferSpan payload, uint32_t msgHash)`
-         *
-         * @note `payload` aliases internal RX storage; copy bytes out if you need to retain them.
-         */
-        template <class T>
-        Error registerHandler(uint8_t msgId, T *obj, Error (T::*method)(bufferSpan payload, uint32_t msgHash))
+        /** @brief Build a frame and transmit it. */
+        Error publish(uint8_t msgId, uint32_t msgHash, ByteSpan payload)
         {
-            return router_.registerHandler(msgId, obj, method);
-        }
-
-        /**
-         * @brief Convenience wrapper for type-safe Router handler registration.
-         *
-         * Handler signature: `Error (T::*)(const Msg& msg)`.
-         * Performs automatic schema check and deserialization.
-         */
-        template <class T, class Msg>
-        Error registerHandler(uint8_t msgId, T *obj, Error (T::*method)(const Msg &msg))
-        {
-            return router_.registerHandler(msgId, obj, method);
-        }
-
-        /**
-         * @brief Build frame -> packet and write it to the transport.
-         *
-         * @return Error::OK on success, or specific error on failure.
-         */
-        Error publish(uint8_t msgId, uint32_t msgHash, bufferSpan payload)
-        {
-            if (!wired_)
-            {
-                return Error::InvalidParameter;
-            }
-
-            bufferSpan frame{txFrame_, kMaxFrameSize};
-            Error err = router_.buildFrame(msgId, msgHash, payload, frame);
+            ByteSpan frame{txFrame_, kMaxFrameSize};
+            Error err = protocol::encodeFrame(expectedVersion_, msgId, msgHash, payload, frame);
             if (err != Error::OK)
             {
                 return err;
             }
 
-            bufferSpan packet{txPacket_, kMaxPacketSize};
-            err = framer_.createPacket(frame, packet);
+            ByteSpan packet{txPacket_, kMaxPacketSize};
+            err = framer_.encode(frame, packet);
             if (err != Error::OK)
             {
                 return err;
@@ -162,22 +123,17 @@ namespace umsg
         }
 
         /**
-         * @brief Publish a typed message with an explicit msgId.
+         * @brief Publish a typed message.
          *
-         * Requirements on Msg:
-         * - static const uint32_t kMsgHash
-         * - bool encode(umsg::bufferSpan& payload) const
-         *
-         * @note The message is encoded into an internal scratch buffer and then published.
-         *       This function is not re-entrant.
+         * Requires `Msg::kMsgHash` and `bool Msg::encode(ByteSpan& payload) const`.
          */
         template <class Msg>
         Error publish(uint8_t msgId, const Msg &msg)
         {
-            bufferSpan payload{txPacket_, MaxPayloadSize};
+            ByteSpan payload{txEncode_, MaxPayloadSize};
             if (!msg.encode(payload))
             {
-                return Error::InvalidParameter;
+                return Error::InvalidArgument;
             }
             return publish(msgId, Msg::kMsgHash, payload);
         }
@@ -185,10 +141,10 @@ namespace umsg
     private:
         Transport &transport_;
         FramerType framer_;
-        RouterType router_;
+        DispatcherType dispatcher_;
+        uint8_t expectedVersion_;
 
-        bool wired_;
-
+        uint8_t txEncode_[MaxPayloadSize];
         uint8_t txFrame_[kMaxFrameSize];
         uint8_t txPacket_[kMaxPacketSize];
     };

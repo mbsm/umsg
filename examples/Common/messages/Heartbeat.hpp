@@ -19,7 +19,7 @@ struct Heartbeat
     static const uint32_t kMsgHash = 0xF5BA0031u;
     static const size_t kPayloadSize = sizeof(uint32_t);
 
-    bool encode(umsg::bufferSpan& payload) const
+    bool encode(umsg::ByteSpan& payload) const
     {
         if (!payload.data) return false;
         const size_t cap = payload.length;
@@ -30,7 +30,7 @@ struct Heartbeat
         return true;
     }
 
-    bool decode(umsg::bufferSpan payload)
+    bool decode(umsg::ByteSpan payload)
     {
         if (payload.length < kPayloadSize) return false;
         umsg::Reader r(payload);

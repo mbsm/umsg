@@ -8,7 +8,7 @@ add_executable(umsg_tests
     test_framer.cpp
     test_marshal.cpp
     test_node.cpp
-    test_router.cpp
+    test_dispatcher.cpp
 )
 
 # Link against the main library

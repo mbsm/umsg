@@ -98,7 +98,7 @@ namespace
 
         Sink() : called(false), hash(0), payloadLen(0) {}
 
-        umsg::Error onPayload(umsg::bufferSpan p, uint32_t h)
+        umsg::Error onPayload(umsg::ByteSpan p, uint32_t h)
         {
             called = true;
             hash = h;
@@ -125,18 +125,15 @@ namespace
         umsg::Node<DuplexLink<1024>::Endpoint, 32, 4> nodeA(a, 1);
         umsg::Node<DuplexLink<1024>::Endpoint, 32, 4> nodeB(b, 1);
 
-        UMSG_TEST_EXPECT_TRUE(ctx, nodeA.ok());
-        UMSG_TEST_EXPECT_TRUE(ctx, nodeB.ok());
-
         Sink sink;
-        UMSG_TEST_EXPECT_TRUE(ctx, nodeB.registerHandler(9, &sink, &Sink::onPayload) == umsg::Error::OK);
+        UMSG_TEST_EXPECT_TRUE(ctx, nodeB.subscribe(9, &sink, &Sink::onPayload) == umsg::Error::OK);
 
         uint8_t payloadBytes[3] = {0x10, 0x00, 0x20};
-        const umsg::Error sent = nodeA.publish(9, 0xAABBCCDDu, umsg::bufferSpan{payloadBytes, sizeof(payloadBytes)});
+        const umsg::Error sent = nodeA.publish(9, 0xAABBCCDDu, umsg::ByteSpan{payloadBytes, sizeof(payloadBytes)});
         UMSG_TEST_EXPECT_TRUE(ctx, sent == umsg::Error::OK);
 
-        const size_t errors = nodeB.poll();
-        UMSG_TEST_EXPECT_EQ_SIZE(ctx, 0, errors);
+        // poll() now returns bytes consumed; we just need it to have processed enough to dispatch.
+        (void)nodeB.poll();
 
         UMSG_TEST_EXPECT_TRUE(ctx, sink.called);
         UMSG_TEST_EXPECT_EQ_U32(ctx, 0xAABBCCDDu, sink.hash);

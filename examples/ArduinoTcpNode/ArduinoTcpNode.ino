@@ -51,7 +51,7 @@ void setup() {
     Serial.println("\nWiFi Connected.");
 
     // Register handlers before connecting loop
-    node.registerHandler(MSG_ROBOT_STATE, &handler, &Handler::onRobotState);
+    node.subscribe(MSG_ROBOT_STATE, &handler, &Handler::onRobotState);
 }
 
 void loop() {
