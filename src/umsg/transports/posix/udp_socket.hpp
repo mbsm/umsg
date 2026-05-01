@@ -20,10 +20,16 @@ namespace posix {
 class UdpSocket {
 public:
     UdpSocket() : fd_(-1), bufLen_(0), bufIdx_(0) {}
-    
+
     ~UdpSocket() {
         close();
     }
+
+    // Non-copyable, non-movable: copying would alias `fd_` and double-close.
+    UdpSocket(const UdpSocket&) = delete;
+    UdpSocket& operator=(const UdpSocket&) = delete;
+    UdpSocket(UdpSocket&&) = delete;
+    UdpSocket& operator=(UdpSocket&&) = delete;
 
     // Bind to a local port to receive packets
     bool bind(uint16_t port) {
@@ -43,17 +49,29 @@ public:
             return false;
         }
 
-        makeNonBlocking();
+        if (!makeNonBlocking()) {
+            close();
+            return false;
+        }
         return true;
     }
 
-    // Set a default destination for write()
-    void setDestination(const char* ip, uint16_t port) {
-        memset(&destAddr_, 0, sizeof(destAddr_));
-        destAddr_.sin_family = AF_INET;
-        destAddr_.sin_port = htons(port);
-        inet_pton(AF_INET, ip, &destAddr_.sin_addr);
+    /**
+     * @brief Set the default destination for write().
+     * @return true if @p ip parsed as a valid IPv4 address; false otherwise
+     *         (in which case the destination is left unset and write() will fail).
+     */
+    bool setDestination(const char* ip, uint16_t port) {
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        if (::inet_pton(AF_INET, ip, &addr.sin_addr) != 1) {
+            return false;
+        }
+        destAddr_ = addr;
         hasDest_ = true;
+        return true;
     }
 
     void close() {
@@ -86,10 +104,11 @@ public:
     }
 
 private:
-    void makeNonBlocking() {
-        if (fd_ < 0) return;
+    bool makeNonBlocking() {
+        if (fd_ < 0) return false;
         int flags = ::fcntl(fd_, F_GETFL, 0);
-        ::fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
+        if (flags == -1) return false;
+        return ::fcntl(fd_, F_SETFL, flags | O_NONBLOCK) != -1;
     }
 
     int fd_;

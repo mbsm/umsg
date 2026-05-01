@@ -27,6 +27,13 @@ public:
 
     ~FdStream() { closeFd(); }
 
+    // Non-copyable, non-movable: copying would alias the same `fd_` and
+    // double-close on destruction.
+    FdStream(const FdStream&) = delete;
+    FdStream& operator=(const FdStream&) = delete;
+    FdStream(FdStream&&) = delete;
+    FdStream& operator=(FdStream&&) = delete;
+
     bool isOpen() const { return fd_ >= 0; }
 
     void close() { closeFd(); }
@@ -68,9 +75,17 @@ public:
                     do {
                         pr = ::poll(&pfd, 1, -1);
                     } while (pr < 0 && errno == EINTR);
-                    if (pr < 0) return total;
+                    if (pr < 0) {
+                        // poll() failure on a previously-good fd is fatal.
+                        closeFd();
+                        return total;
+                    }
                     continue;
                 }
+                // Hard error (EPIPE, ECONNRESET, EBADF, EIO, ...): the fd is
+                // unusable. Close it so isOpen() reflects reality and the next
+                // read() returns -1 promptly instead of looping on a dead fd.
+                closeFd();
                 return total;
             }
             total += static_cast<size_t>(n);

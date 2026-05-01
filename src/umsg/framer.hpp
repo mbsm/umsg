@@ -98,18 +98,19 @@ namespace umsg
 
             if (byte == 0x00)
             {
-                const bool wasResyncing = resyncing_;
-                resyncing_ = false;
                 const size_t encodedLen = rxIndex_;
                 rxIndex_ = 0;
 
-                if (encodedLen == 0)
+                if (resyncing_)
                 {
+                    // Dropped the oversized packet; this delimiter restores framing.
+                    // (rxIndex_ has stayed at 0 throughout the resync, so encodedLen
+                    // is always 0 here — no decode work to skip.)
+                    resyncing_ = false;
                     return r;
                 }
-                if (wasResyncing)
+                if (encodedLen == 0)
                 {
-                    // Dropped the oversized packet; this delimiter restarts framing.
                     return r;
                 }
 

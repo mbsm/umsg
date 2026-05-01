@@ -63,11 +63,12 @@ namespace umsg
     /**
      * @brief COBS worst-case overhead for an input of @p n bytes (delimiter not included).
      *
-     * Worst-case expansion is `ceil(n/254)`.
+     * Worst-case expansion is `ceil(n/254)` for `n >= 1`. Empty input still
+     * produces a single 0x01 code byte, so `n == 0` yields 1.
      */
     inline constexpr size_t cobsMaxOverhead(size_t n)
     {
-        return (n + 253u) / 254u;
+        return n == 0 ? 1u : (n + 253u) / 254u;
     }
 
     /** @brief Wire frame header size: `version(1) | msg_id(1) | msg_hash(4) | len(2)`. */
