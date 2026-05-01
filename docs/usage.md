@@ -2,35 +2,51 @@
 
 ## Transports
 
-A transport is any type with the following two methods:
+A transport is any type that exposes the Arduino `Stream`-shaped contract:
 
 ```cpp
-bool read(uint8_t& byte);                       // non-blocking
-bool write(const uint8_t* data, size_t len);    // true iff all bytes written
+int    read();                                  // returns byte (0..255), or -1 if empty
+size_t write(const uint8_t* data, size_t len);  // returns bytes actually written
 ```
 
-Ready-to-use transports are included:
+`Node::publish` treats a short write (`returned < len`) as `Error::TransportError`;
+on `Serial` this never happens, but TCP transports may need to handle backpressure.
 
-| Platform | Header | Class |
+### Arduino: pass `Stream` objects directly
+
+Anything deriving from `Stream` already satisfies the contract — no wrapper
+required:
+
+```cpp
+umsg::Node<decltype(Serial), 256, 8> node(Serial);          // HardwareSerial
+umsg::Node<WiFiClient,        256, 8> node(wifiClient);     // EthernetClient/WiFiClient
+umsg::Node<SoftwareSerial,    256, 8> node(softSerial);
+```
+
+For things that are *not* a `Stream` (Arduino UDP), a thin adapter is included:
+
+| Header | Class | Notes |
 | --- | --- | --- |
-| Arduino | `umsg/transports/arduino/stream.hpp` | `umsg::arduino::StreamTransport` |
-| Arduino | `umsg/transports/arduino/udp.hpp` | `umsg::arduino::UdpTransport` |
-| Arduino | `umsg/transports/arduino/tcp_client.hpp` | `umsg::arduino::TcpClientTransport` |
-| POSIX | `umsg/transports/posix/serial_port.hpp` | `umsg::posix::SerialPort` |
-| POSIX | `umsg/transports/posix/udp_socket.hpp` | `umsg::posix::UdpSocket` |
-| POSIX | `umsg/transports/posix/tcp_client.hpp` | `umsg::posix::TcpClient` |
+| `umsg/transports/arduino/udp.hpp` | `umsg::arduino::UdpTransport<UdpClass>` | Wraps `WiFiUDP` / `EthernetUDP` |
 
-Or write your own:
+### POSIX
+
+| Header | Class |
+| --- | --- |
+| `umsg/transports/posix/serial_port.hpp` | `umsg::posix::SerialPort` |
+| `umsg/transports/posix/udp_socket.hpp` | `umsg::posix::UdpSocket` |
+| `umsg/transports/posix/tcp_client.hpp` | `umsg::posix::TcpClient` |
+
+### Writing your own
 
 ```cpp
 struct MyTransport {
-    bool read(uint8_t& byte) {
-        if (uart_is_empty()) return false;
-        byte = uart_read();
-        return true;
+    int read() {
+        if (uart_is_empty()) return -1;
+        return uart_read();              // returns 0..255
     }
-    bool write(const uint8_t* data, size_t len) {
-        return uart_write_buffer(data, len);
+    size_t write(const uint8_t* data, size_t len) {
+        return uart_write_buffer(data, len);   // bytes actually written
     }
 };
 ```
