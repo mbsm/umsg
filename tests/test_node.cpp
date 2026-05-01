@@ -54,21 +54,26 @@ namespace
             Ring<Capacity> *in;
             Ring<Capacity> *out;
 
-            bool read(uint8_t &byte)
+            int read()
             {
-                return in->pop(byte);
+                uint8_t b;
+                if (!in->pop(b))
+                {
+                    return -1;
+                }
+                return static_cast<int>(b);
             }
 
-            bool write(const uint8_t *data, size_t length)
+            size_t write(const uint8_t *data, size_t length)
             {
                 for (size_t i = 0; i < length; ++i)
                 {
                     if (!out->push(data[i]))
                     {
-                        return false;
+                        return i;
                     }
                 }
-                return true;
+                return length;
             }
         };
 

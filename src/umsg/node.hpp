@@ -18,7 +18,10 @@ namespace umsg
     /**
      * @brief Integrates a transport, a `Framer`, and a `Dispatcher`.
      *
-     * @tparam Transport User type with `bool read(uint8_t&)` and `bool write(const uint8_t*, size_t)`.
+     * @tparam Transport User type exposing two methods:
+     *   - `int read();` returns the next byte (`0..255`) or `-1` when no byte is available.
+     *   - `size_t write(const uint8_t* buf, size_t len);` returns the number of bytes
+     *     actually written. A short write (`< len`) is reported as `Error::TransportError`.
      * @tparam MaxPayloadSize Maximum payload size for frames built/accepted.
      * @tparam MaxHandlers Maximum number of handlers to register.
      *
@@ -83,11 +86,10 @@ namespace umsg
         size_t poll()
         {
             size_t bytes = 0;
-            uint8_t byte = 0;
-            while (transport_.read(byte))
+            for (int c = transport_.read(); c >= 0; c = transport_.read())
             {
                 ++bytes;
-                typename FramerType::Result r = framer_.feed(byte);
+                typename FramerType::Result r = framer_.feed(static_cast<uint8_t>(c));
                 if (r.complete)
                 {
                     protocol::Header h;
@@ -123,7 +125,7 @@ namespace umsg
                 return err;
             }
 
-            if (!transport_.write(packet.data, packet.length))
+            if (transport_.write(packet.data, packet.length) != packet.length)
             {
                 return Error::TransportError;
             }

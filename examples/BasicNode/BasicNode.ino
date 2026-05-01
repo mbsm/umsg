@@ -18,7 +18,6 @@
  *   messages/SetLed.hpp
  */
 
-#include <umsg/transports/arduino.hpp>
 #include <umsg/umsg.h>
 
 // Generated headers
@@ -49,8 +48,8 @@ struct Controller
 };
 
 // --- 3. Globals ---
-umsg::ArduinoStream transport(Serial);
-umsg::Node<umsg::ArduinoStream, 64, 4> node(transport);
+// Serial is an Arduino Stream, so it satisfies the Node transport contract directly.
+umsg::Node<decltype(Serial), 64, 4> node(Serial);
 Controller controller;
 
 // --- 4. Setup ---

@@ -74,12 +74,11 @@ public:
 
     bool isOpen() const { return fd_ >= 0; }
 
-    bool read(uint8_t& byte) {
-        if (fd_ < 0) return false;
+    int read() {
+        if (fd_ < 0) return -1;
 
         if (bufIdx_ < bufLen_) {
-            byte = rxBuffer_[bufIdx_++];
-            return true;
+            return rxBuffer_[bufIdx_++];
         }
 
         ssize_t n;
@@ -89,17 +88,16 @@ public:
 
         if (n <= 0) {
             // n == 0: peer closed; n < 0 with EAGAIN: nothing to read now.
-            return false;
+            return -1;
         }
 
         bufLen_ = static_cast<size_t>(n);
         bufIdx_ = 0;
-        byte = rxBuffer_[bufIdx_++];
-        return true;
+        return rxBuffer_[bufIdx_++];
     }
 
-    bool write(const uint8_t* data, size_t length) {
-        if (fd_ < 0) return false;
+    size_t write(const uint8_t* data, size_t length) {
+        if (fd_ < 0) return 0;
 
         size_t total = 0;
         while (total < length) {
@@ -115,14 +113,14 @@ public:
                     do {
                         pr = ::poll(&pfd, 1, -1);
                     } while (pr < 0 && errno == EINTR);
-                    if (pr < 0) return false;
+                    if (pr < 0) return total;
                     continue;
                 }
-                return false;
+                return total;
             }
             total += static_cast<size_t>(n);
         }
-        return true;
+        return total;
     }
 
 private:

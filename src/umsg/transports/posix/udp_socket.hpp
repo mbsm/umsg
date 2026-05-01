@@ -65,38 +65,31 @@ public:
     }
 
     // Buffer incoming datagrams to satisfy the byte-by-byte read interface
-    bool read(uint8_t& byte) {
-        if (fd_ < 0) return false;
+    int read() {
+        if (fd_ < 0) return -1;
 
-        // If we have data buffered from the last packet, serve it
         if (bufIdx_ < bufLen_) {
-            byte = rxBuffer_[bufIdx_++];
-            return true;
+            return rxBuffer_[bufIdx_++];
         }
 
-        // Try to read a new packet
         struct sockaddr_in sender;
         socklen_t slen = sizeof(sender);
         ssize_t len = ::recvfrom(fd_, rxBuffer_, sizeof(rxBuffer_), 0, (struct sockaddr*)&sender, &slen);
-        
+
         if (len > 0) {
-            // We got a packet
             bufLen_ = static_cast<size_t>(len);
             bufIdx_ = 0;
-            byte = rxBuffer_[bufIdx_++];
-            // Optional: capture sender addr if we want to reply? 
-            // For now, simple fixed dest topology.
-            return true;
+            return rxBuffer_[bufIdx_++];
         }
 
-        return false;
+        return -1;
     }
 
-    bool write(const uint8_t* data, size_t length) {
-        if (fd_ < 0 || !hasDest_) return false;
-        
+    size_t write(const uint8_t* data, size_t length) {
+        if (fd_ < 0 || !hasDest_) return 0;
+
         ssize_t sent = ::sendto(fd_, data, length, 0, (struct sockaddr*)&destAddr_, sizeof(destAddr_));
-        return (sent >= 0 && static_cast<size_t>(sent) == length);
+        return (sent < 0) ? 0 : static_cast<size_t>(sent);
     }
 
 private:

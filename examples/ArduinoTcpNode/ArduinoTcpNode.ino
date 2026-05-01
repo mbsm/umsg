@@ -11,7 +11,6 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 
-#include <umsg/transports/arduino/tcp_client.hpp>
 #include <umsg/umsg.h>
 #include "messages/Heartbeat.hpp"
 #include "messages/RobotState.hpp"
@@ -22,9 +21,9 @@ const char* PASS = "YOUR_PASS";
 const char* SERVER_IP = "192.168.1.50";
 const uint16_t SERVER_PORT = 9000;
 
+// WiFiClient inherits from Stream, so umsg::Node uses it directly.
 WiFiClient wifiClient;
-umsg::arduino::TcpClientTransport<WiFiClient> transport(wifiClient);
-umsg::Node<umsg::arduino::TcpClientTransport<WiFiClient>, 128, 4> node(transport);
+umsg::Node<WiFiClient, 128, 4> node(wifiClient);
 
 const uint32_t MSG_HEARTBEAT = 1;
 const uint32_t MSG_ROBOT_STATE = 20;
@@ -56,9 +55,9 @@ void setup() {
 
 void loop() {
     // Reconnect logic
-    if (!transport.isConnected()) {
+    if (!wifiClient.connected()) {
         Serial.print("Connecting to server...");
-        if (transport.connect(SERVER_IP, SERVER_PORT)) {
+        if (wifiClient.connect(SERVER_IP, SERVER_PORT)) {
             Serial.println("OK");
         } else {
             Serial.println("Fail");
@@ -78,7 +77,7 @@ void loop() {
         messages::Heartbeat hb;
         hb.uptime_ms = millis();
         
-        if (node.publish(MSG_HEARTBEAT, hb)) {
+        if (node.publish(MSG_HEARTBEAT, hb) == umsg::Error::OK) {
              Serial.println("Tx Heartbeat");
         }
     }

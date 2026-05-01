@@ -27,33 +27,25 @@ public:
         destPort_ = port;
     }
 
-    bool read(uint8_t& byte) {
-        // If we have bytes left in the current packet, return one
+    int read() {
         if (udp_.available() > 0) {
-            byte = (uint8_t)udp_.read();
-            return true;
+            return udp_.read();
         }
-
-        // Try to parse a new packet
-        if (udp_.parsePacket() > 0) {
-            if (udp_.available() > 0) {
-                byte = (uint8_t)udp_.read();
-                return true;
-            }
+        if (udp_.parsePacket() > 0 && udp_.available() > 0) {
+            return udp_.read();
         }
-
-        return false;
+        return -1;
     }
 
-    bool write(const uint8_t* data, size_t length) {
+    size_t write(const uint8_t* data, size_t length) {
         if (udp_.beginPacket(destIp_, destPort_) != 1) {
-            return false;
+            return 0;
         }
         size_t written = udp_.write(data, length);
         if (udp_.endPacket() != 1) {
-            return false;
+            return 0;
         }
-        return (written == length);
+        return written;
     }
 
 private:
