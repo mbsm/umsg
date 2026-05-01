@@ -1,40 +1,33 @@
 #pragma once
 
 #include <fcntl.h>
-#include <poll.h>
 #include <termios.h>
 #include <unistd.h>
-#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include "detail/fd_stream.hpp"
 
 namespace umsg {
 namespace posix {
 
 /**
- * @brief POSIX Serial Port Transport.
+ * @brief POSIX Serial Port Transport. Configures a tty for 8N1.
  *
- * Configures a serial port (tty) for 8N1 communication.
+ * Read/write/close/isOpen are inherited from `detail::FdStream` and provide
+ * the umsg `Transport` contract.
  */
-class SerialPort {
+class SerialPort : public detail::FdStream<256> {
 public:
-    SerialPort() : fd_(-1), bufLen_(0), bufIdx_(0) {}
-
-    ~SerialPort() {
-        close();
-    }
-
     bool open(const char* device, speed_t baudRate = B115200) {
-        if (fd_ >= 0) close();
-
-        // O_NOCTTY: do not become the controlling terminal for this process.
+        // O_NOCTTY: don't become the controlling terminal.
         // O_NONBLOCK: non-blocking I/O from the start; avoids races vs. a later fcntl.
-        fd_ = ::open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
-        if (fd_ < 0) return false;
+        int fd = ::open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+        if (fd < 0) return false;
 
         struct termios options;
-        if (::tcgetattr(fd_, &options) < 0) {
-            close();
+        if (::tcgetattr(fd, &options) < 0) {
+            ::close(fd);
             return false;
         }
 
@@ -47,7 +40,7 @@ public:
         options.c_cflag &= ~CSIZE;
         options.c_cflag |= CS8;
 
-        // Disable hardware flow control
+        // No hardware flow control
         options.c_cflag &= ~CRTSCTS;
 
         // Local line, read enabled
@@ -57,82 +50,14 @@ public:
         options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
         options.c_oflag &= ~OPOST;
 
-        if (::tcsetattr(fd_, TCSANOW, &options) < 0) {
-            close();
+        if (::tcsetattr(fd, TCSANOW, &options) < 0) {
+            ::close(fd);
             return false;
         }
 
-        bufLen_ = 0;
-        bufIdx_ = 0;
+        setFd(fd);
         return true;
     }
-
-    void close() {
-        if (fd_ >= 0) {
-            ::close(fd_);
-            fd_ = -1;
-        }
-        bufLen_ = 0;
-        bufIdx_ = 0;
-    }
-
-    bool isOpen() const { return fd_ >= 0; }
-
-    int read() {
-        if (fd_ < 0) return -1;
-
-        if (bufIdx_ < bufLen_) {
-            return rxBuffer_[bufIdx_++];
-        }
-
-        ssize_t n;
-        do {
-            n = ::read(fd_, rxBuffer_, sizeof(rxBuffer_));
-        } while (n < 0 && errno == EINTR);
-
-        if (n <= 0) {
-            return -1;
-        }
-
-        bufLen_ = static_cast<size_t>(n);
-        bufIdx_ = 0;
-        return rxBuffer_[bufIdx_++];
-    }
-
-    size_t write(const uint8_t* data, size_t length) {
-        if (fd_ < 0) return 0;
-
-        size_t total = 0;
-        while (total < length) {
-            ssize_t n = ::write(fd_, data + total, length - total);
-            if (n < 0) {
-                if (errno == EINTR) continue;
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // Wait until the tty accepts more data instead of busy-spinning.
-                    struct pollfd pfd;
-                    pfd.fd = fd_;
-                    pfd.events = POLLOUT;
-                    int pr;
-                    do {
-                        pr = ::poll(&pfd, 1, -1);
-                    } while (pr < 0 && errno == EINTR);
-                    if (pr < 0) return total;
-                    continue;
-                }
-                return total;
-            }
-            total += static_cast<size_t>(n);
-        }
-        return total;
-    }
-
-private:
-    int fd_;
-
-    // Buffer incoming bytes to avoid one syscall per byte.
-    uint8_t rxBuffer_[256];
-    size_t bufLen_;
-    size_t bufIdx_;
 };
 
 } // namespace posix

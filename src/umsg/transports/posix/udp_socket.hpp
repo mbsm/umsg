@@ -12,11 +12,10 @@ namespace posix {
 
 /**
  * @brief Simple POSIX UDP Socket Transport.
- * 
- * Supports reading/writing datagrams. 
- * Note: umsg is a stream protocol (COBS framed), so it technically survives
- * fragmentation, but UDP packet boundaries do not necessarily map 1:1 to umsg frames.
- * However, `read(byte)` interface abstracts that away.
+ *
+ * Datagrams are buffered internally so the byte-at-a-time `read()` contract
+ * is preserved. UDP packet boundaries do not have to align with umsg frame
+ * boundaries — COBS resyncs at the next `0x00`.
  */
 class UdpSocket {
 public:
@@ -64,7 +63,6 @@ public:
         }
     }
 
-    // Buffer incoming datagrams to satisfy the byte-by-byte read interface
     int read() {
         if (fd_ < 0) return -1;
 
@@ -72,17 +70,12 @@ public:
             return rxBuffer_[bufIdx_++];
         }
 
-        struct sockaddr_in sender;
-        socklen_t slen = sizeof(sender);
-        ssize_t len = ::recvfrom(fd_, rxBuffer_, sizeof(rxBuffer_), 0, (struct sockaddr*)&sender, &slen);
+        ssize_t len = ::recvfrom(fd_, rxBuffer_, sizeof(rxBuffer_), 0, nullptr, nullptr);
+        if (len <= 0) return -1;
 
-        if (len > 0) {
-            bufLen_ = static_cast<size_t>(len);
-            bufIdx_ = 0;
-            return rxBuffer_[bufIdx_++];
-        }
-
-        return -1;
+        bufLen_ = static_cast<size_t>(len);
+        bufIdx_ = 0;
+        return rxBuffer_[bufIdx_++];
     }
 
     size_t write(const uint8_t* data, size_t length) {
@@ -103,8 +96,6 @@ private:
     struct sockaddr_in destAddr_;
     bool hasDest_ = false;
 
-    // UDP is datagram based, but Node expects a stream of bytes.
-    // We must buffer the current datagram.
     uint8_t rxBuffer_[4096];
     size_t bufLen_;
     size_t bufIdx_;

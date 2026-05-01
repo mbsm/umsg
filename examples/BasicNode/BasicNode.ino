@@ -39,9 +39,6 @@ struct Controller
 
     umsg::Error onSetLed(const messages::SetLed &msg)
     {
-        // Schema hash check and decode are handled by the Dispatcher.
-
-        // 3. Act
         digitalWrite(LED_BUILTIN, msg.state ? HIGH : LOW);
         return umsg::Error::OK;
     }

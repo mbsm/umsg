@@ -28,10 +28,7 @@ public:
     }
 
     int read() {
-        if (udp_.available() > 0) {
-            return udp_.read();
-        }
-        if (udp_.parsePacket() > 0 && udp_.available() > 0) {
+        if (udp_.available() > 0 || udp_.parsePacket() > 0) {
             return udp_.read();
         }
         return -1;

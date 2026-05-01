@@ -4,11 +4,11 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <string.h>
-#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include "detail/fd_stream.hpp"
 
 namespace umsg {
 namespace posix {
@@ -16,22 +16,15 @@ namespace posix {
 /**
  * @brief Simple POSIX TCP Client Transport.
  *
- * Non-blocking reads (buffered to avoid one syscall per byte); blocking writes
- * that wait on `poll()` when the send buffer is full instead of busy-spinning.
+ * Read/write/close/isOpen are inherited from `detail::FdStream`. Reads are
+ * non-blocking (the rx buffer coalesces one syscall into many bytes); writes
+ * wait on `poll()` when the send buffer is full instead of busy-spinning.
  */
-class TcpClient {
+class TcpClient : public detail::FdStream<512> {
 public:
-    TcpClient() : fd_(-1), bufLen_(0), bufIdx_(0) {}
-
-    ~TcpClient() {
-        close();
-    }
-
     bool connect(const char* ip, uint16_t port) {
-        if (fd_ >= 0) close();
-
-        fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
-        if (fd_ < 0) return false;
+        int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+        if (fd < 0) return false;
 
         struct sockaddr_in serv_addr;
         ::memset(&serv_addr, 0, sizeof(serv_addr));
@@ -39,97 +32,24 @@ public:
         serv_addr.sin_port = htons(port);
 
         if (::inet_pton(AF_INET, ip, &serv_addr.sin_addr) <= 0) {
-            close();
+            ::close(fd);
             return false;
         }
 
-        if (::connect(fd_, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-            close();
+        if (::connect(fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+            ::close(fd);
             return false;
         }
 
-        int flags = ::fcntl(fd_, F_GETFL, 0);
-        if (flags == -1) {
-            close();
-            return false;
-        }
-        if (::fcntl(fd_, F_SETFL, flags | O_NONBLOCK) == -1) {
-            close();
+        int flags = ::fcntl(fd, F_GETFL, 0);
+        if (flags == -1 || ::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+            ::close(fd);
             return false;
         }
 
-        bufLen_ = 0;
-        bufIdx_ = 0;
+        setFd(fd);
         return true;
     }
-
-    void close() {
-        if (fd_ >= 0) {
-            ::close(fd_);
-            fd_ = -1;
-        }
-        bufLen_ = 0;
-        bufIdx_ = 0;
-    }
-
-    bool isOpen() const { return fd_ >= 0; }
-
-    int read() {
-        if (fd_ < 0) return -1;
-
-        if (bufIdx_ < bufLen_) {
-            return rxBuffer_[bufIdx_++];
-        }
-
-        ssize_t n;
-        do {
-            n = ::read(fd_, rxBuffer_, sizeof(rxBuffer_));
-        } while (n < 0 && errno == EINTR);
-
-        if (n <= 0) {
-            // n == 0: peer closed; n < 0 with EAGAIN: nothing to read now.
-            return -1;
-        }
-
-        bufLen_ = static_cast<size_t>(n);
-        bufIdx_ = 0;
-        return rxBuffer_[bufIdx_++];
-    }
-
-    size_t write(const uint8_t* data, size_t length) {
-        if (fd_ < 0) return 0;
-
-        size_t total = 0;
-        while (total < length) {
-            ssize_t n = ::write(fd_, data + total, length - total);
-            if (n < 0) {
-                if (errno == EINTR) continue;
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // Wait for send buffer space instead of busy-spinning.
-                    struct pollfd pfd;
-                    pfd.fd = fd_;
-                    pfd.events = POLLOUT;
-                    int pr;
-                    do {
-                        pr = ::poll(&pfd, 1, -1);
-                    } while (pr < 0 && errno == EINTR);
-                    if (pr < 0) return total;
-                    continue;
-                }
-                return total;
-            }
-            total += static_cast<size_t>(n);
-        }
-        return total;
-    }
-
-private:
-    int fd_;
-
-    // Buffer incoming bytes so read() doesn't syscall per byte.
-    uint8_t rxBuffer_[512];
-    size_t bufLen_;
-    size_t bufIdx_;
 };
 
 } // namespace posix
