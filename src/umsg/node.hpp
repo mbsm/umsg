@@ -38,11 +38,34 @@ namespace umsg
      *   common pitfall on Arduino: a global `Node` with a handler instance
      *   declared as a local in `setup()` will silently use-after-free.
      *
-     * @warning Thread safety: not thread-safe. `poll()` and `publish()` share
-     *   internal scratch buffers and the framer/dispatcher state; concurrent
-     *   calls from multiple threads must be serialized externally. A handler
-     *   invoked from `poll()` may safely call `publish()` (single-threaded
-     *   re-entry is fine), but must not call `poll()` recursively.
+     * @warning Thread safety: `Node` is internally split into disjoint RX
+     *   and TX state, which permits a useful single-producer / single-consumer
+     *   model without any locking:
+     *
+     *   - `poll()` only touches RX state (the framer's rx buffer, the
+     *     dispatcher table for reads, and `transport_.read()`).
+     *   - `publish()` only touches TX state (`txEncode_` / `txFrame_` /
+     *     `txPacket_`, a stateless `framer_.encode()` call, and
+     *     `transport_.write()`).
+     *
+     *   Therefore the following call patterns are safe **without** an
+     *   external lock, provided the transport's `read()` and `write()` may
+     *   be called from different threads (true for Arduino HardwareSerial,
+     *   POSIX fds, most TCP/UDP clients):
+     *
+     *   - **One thread calling `poll()` + one thread calling `publish()`.**
+     *     The classic ISR/main or RX-task/TX-task split. Subscribe handlers
+     *     before either thread starts.
+     *   - **A handler invoked from `poll()` calling `publish()`.** Same
+     *     thread, the call sites are disjoint internally.
+     *
+     *   The following patterns **require** external serialization:
+     *
+     *   - Two or more threads concurrently in `publish()` (race on TX scratch).
+     *   - Two or more threads concurrently in `poll()` (race on RX state).
+     *   - `subscribe()` interleaved with a running `poll()` (race on the
+     *     dispatcher table). Treat `subscribe()` as init-time only.
+     *   - Recursive `poll()` from inside a handler (corrupts the framer).
      */
     template <class Transport, size_t MaxPayloadSize, size_t MaxHandlers>
     class Node

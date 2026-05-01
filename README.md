@@ -181,10 +181,15 @@ directly without going through `Node` — see
 - **Lifetime.** `Node` holds non-owning references to its transport and to
   every subscribed handler object. Both must outlive the `Node`. Most common
   pitfall: a global `Node` with a handler declared as a local in `setup()`.
-- **Thread safety.** `Node` is not thread-safe. Serialize `poll()` and
-  `publish()` calls externally. A handler invoked from `poll()` may safely
-  call `publish()` (single-threaded re-entry); recursive `poll()` is not
-  supported.
+- **Thread safety.** `Node` is internally RX/TX-disjoint, so the common
+  embedded pattern works without any locking: **one thread (or ISR) calling
+  `poll()` and one thread calling `publish()` concurrently is safe**, as
+  long as the transport itself allows independent read/write (Arduino
+  `HardwareSerial`, POSIX fds, and most network clients do). A handler may
+  call `publish()` from inside `poll()`. What you must serialize externally:
+  multiple threads in `publish()`, multiple threads in `poll()`, or
+  `subscribe()` calls after `poll()` has started — treat `subscribe()` as
+  init-time only.
 
 ## Documentation
 
