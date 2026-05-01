@@ -27,12 +27,22 @@ namespace umsg
      *
      * Lifecycle:
      * - Construct with a transport reference.
-     * - Register handlers via `on()`.
+     * - Register handlers via `subscribe()`.
      * - Call `poll()` periodically; call `publish()` to transmit.
      *
-     * Reentrancy:
-     * - Do not call `poll()` recursively from a handler.
-     * - `publish()` is not re-entrant (uses internal fixed-size scratch).
+     * @warning Lifetime requirements:
+     * - The `Transport` object must outlive the `Node` (Node holds a reference).
+     * - Every subscribed handler object must outlive the `Node`. The Dispatcher
+     *   holds a non-owning pointer to each handler; calling `poll()` after the
+     *   handler object has been destroyed is undefined behavior. This is a
+     *   common pitfall on Arduino: a global `Node` with a handler instance
+     *   declared as a local in `setup()` will silently use-after-free.
+     *
+     * @warning Thread safety: not thread-safe. `poll()` and `publish()` share
+     *   internal scratch buffers and the framer/dispatcher state; concurrent
+     *   calls from multiple threads must be serialized externally. A handler
+     *   invoked from `poll()` may safely call `publish()` (single-threaded
+     *   re-entry is fine), but must not call `poll()` recursively.
      */
     template <class Transport, size_t MaxPayloadSize, size_t MaxHandlers>
     class Node

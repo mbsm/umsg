@@ -176,6 +176,16 @@ Advanced users can use `Writer` / `Reader`, COBS, CRC32, or the `Framer`
 directly without going through `Node` — see
 [architecture → using components directly](docs/architecture.md#using-components-directly).
 
+## Caveats
+
+- **Lifetime.** `Node` holds non-owning references to its transport and to
+  every subscribed handler object. Both must outlive the `Node`. Most common
+  pitfall: a global `Node` with a handler declared as a local in `setup()`.
+- **Thread safety.** `Node` is not thread-safe. Serialize `poll()` and
+  `publish()` calls externally. A handler invoked from `poll()` may safely
+  call `publish()` (single-threaded re-entry); recursive `poll()` is not
+  supported.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md) — layering, file roles, wire protocol, memory model.
